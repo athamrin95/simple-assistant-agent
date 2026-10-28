@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import MagicMock
 import pytest
 
-from assistant_agent import TOOLS, PSEUDO_DB, list_items, call_ai_with_tools
+from assistant_agent import TOOLS, call_ai_with_tools
 
 class TestDotEnvLoading(unittest.TestCase):
 
