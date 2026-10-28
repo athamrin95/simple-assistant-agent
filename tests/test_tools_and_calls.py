@@ -37,7 +37,7 @@ class TestDotEnvLoading(unittest.TestCase):
         input_list = [{"role": "user", "content": "What items are in the database?"}]
         result = call_ai_with_tools(mock_client, input_list, "test-model")
 
-        assert "output" in result
+        assert "Here are the available items: mouse, keyboard, and webcam." in result
         assert mock_client.responses.create.call_count == 2
         has_tool_output = any(
             isinstance(item, dict) and item.get("type") == "function_call_output"

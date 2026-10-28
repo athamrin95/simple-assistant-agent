@@ -65,11 +65,7 @@ def check_env(api_key:str, base_url:str, model:str) -> str:
     else:
         return None
 
-def call_ai_with_tools(client:OpenAI, input_list:list, openrouter_model:str) -> dict:
-    """Returns a key-value pair if call succeeded or failed.
-    If the call failed, an "error" key is returned.
-    If the call succeeded, a "output" key is returned.
-    """
+def call_ai_with_tools(client:OpenAI, input_list:list, openrouter_model:str) -> str:
     try:
         response = client.responses.create(
             model=openrouter_model,
@@ -95,12 +91,10 @@ def call_ai_with_tools(client:OpenAI, input_list:list, openrouter_model:str) -> 
             input=input_list,
             tools=TOOLS,
         )
-        kv:dict = {"output":response.output_text}
-        return kv
+        return response.output_text
         
     except Exception as e:
-        kv:dict = {"error":f"An error occurred: {e}"}
-        return kv
+        return f"An error occurred: {e}"
 
 def main() -> None:
     load_dotenv()
@@ -123,10 +117,7 @@ def main() -> None:
             continue
         input_list.append({"role": "user", "content": user_input})
         result = call_ai_with_tools(client, input_list, openrouter_model)
-        if "output" in result:
-            print(result["output"])
-        elif "error" in result:
-            print(result["error"])
+        print(result)
 
 
 if __name__ == "__main__":
