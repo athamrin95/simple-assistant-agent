@@ -123,8 +123,10 @@ def call_ai_with_tools(client:OpenAI, input_list:list, openrouter_model:str) -> 
             tools=TOOLS,
         )
         input_list += response.output
+        tools_called = False
         for item in response.output:
             if item.type == "function_call":
+                tools_called = True
                 print(f"Tool {item.name} has been requested by the agent")
                 if item.name == "list_items":
                     tool_output = list_items(PSEUDO_DB)
@@ -144,12 +146,13 @@ def call_ai_with_tools(client:OpenAI, input_list:list, openrouter_model:str) -> 
                         "output": tool_output,
                     }
                 )
-        response = client.responses.create(
-            model=openrouter_model,
-            instructions=INSTRUCTIONS,
-            input=input_list,
-            tools=TOOLS,
-        )
+        if tools_called:
+            response = client.responses.create(
+                model=openrouter_model,
+                instructions=INSTRUCTIONS,
+                input=input_list,
+                tools=TOOLS,
+            )
         return response.output_text
         
     except Exception as e:
