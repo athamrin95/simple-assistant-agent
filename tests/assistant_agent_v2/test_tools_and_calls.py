@@ -3,9 +3,9 @@ import unittest
 from unittest.mock import MagicMock
 import pytest
 
-from assistant_agent import TOOLS, call_ai_with_tools
+from assistant_agent_v2 import TOOLS, count_total, call_ai_with_tools
 
-class TestDotEnvLoading(unittest.TestCase):
+class TestToolsAndCalls(unittest.TestCase):
 
     def test_tools_json_validity(self):
         try:
@@ -16,28 +16,33 @@ class TestDotEnvLoading(unittest.TestCase):
         except (TypeError, ValueError) as e:
             pytest.fail(f"TOOLS structure is not valid JSON serializable: {e}")
 
+    def test_count_total_success_and_missing(self):
+        test_items = ["Mouse nirkabel", "NonExistentItem", "Headset"]
+        result = count_total(test_items)
+        assert "470000" in result
+        assert "NonExistentItem" in result
+
     def test_call_ai_with_tools_mocked(self):
         mock_client = MagicMock()
-        mock_tool_call_item = MagicMock()
-        mock_tool_call_item.type = "function_call"
-        mock_tool_call_item.name = "list_items"
-        mock_tool_call_item.call_id = "call_mock_123"
+        mock_tool_call = MagicMock()
+        mock_tool_call.type = "function_call"
+        mock_tool_call.name = "count_total"
+        mock_tool_call.call_id = "call_xyz_789"
+        mock_tool_call.arguments = json.dumps({"item_names": ["Mouse nirkabel"]})
 
         first_response_mock = MagicMock()
-        first_response_mock.output = [mock_tool_call_item]
+        first_response_mock.output = [mock_tool_call]
         second_response_mock = MagicMock()
-        second_response_mock.output_text = (
-            "Here are the available items: mouse, keyboard, and webcam."
-        )
+        second_response_mock.output_text = "The total price for the Mouse nirkabel is 150,000."
         mock_client.responses.create.side_effect = [
             first_response_mock,
             second_response_mock,
         ]
 
-        input_list = [{"role": "user", "content": "What items are in the database?"}]
+        input_list = [{"role": "user", "content": "How much is the Mouse nirkabel?"}]
         result = call_ai_with_tools(mock_client, input_list, "test-model")
 
-        assert "Here are the available items: mouse, keyboard, and webcam." in result
+        assert "150,000" in result
         assert mock_client.responses.create.call_count == 2
         has_tool_output = any(
             isinstance(item, dict) and item.get("type") == "function_call_output"
