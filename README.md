@@ -19,4 +19,5 @@ For this version, the call is configured in a way that the agent is allowed to c
 For "assistant_agent_v3.py:<br>
 We've added several safeguards for this version. The agent is instructed to only do one round of function/tool call per user query. A safeguard is also added in case if the agent tried to initiate multiple tool calls.<br>
 We've also added a limit to the message history so the agent would remember only the two most recent queries to limit ballooning cost over protracted chat sessions.<br>
-We've also added a language instruction for the agent to only reply in Bahasa Indonesia.
+We've also added a language instruction for the agent to only reply in Bahasa Indonesia.<br>
+Added the "show history" command as a debugger tool to see all messages to and from the agent that is currently retained "in-memory".
