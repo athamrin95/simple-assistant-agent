@@ -17,7 +17,7 @@ class TestToolsAndCalls(unittest.TestCase):
             pytest.fail(f"TOOLS structure is not valid JSON serializable: {e}")
 
     def test_count_total_success_and_missing(self):
-        test_items = ["Mouse nirkabel", "NonExistentItem", "Headset"]
+        test_items = ["Mouse nirkabel", "NonExistentItem", "headset"]
         result = count_total(test_items)
         assert "470000" in result
         assert "NonExistentItem" in result

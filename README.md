@@ -14,4 +14,4 @@ This current version of the script remembers your previously sent messages (as i
 
 For "assistant_agent_v2.py:<br>
 This script is pretty much the same as "assistant_agent.py", except that we've increased the scope of the tools it can use to more than just one.<br>
-For this version, the call is configured in a way that the agent is allowed to call one or two tools for its needs. It's because of this and due to how the current "database" is setup, the new tool "count_total" is pretty specific/restrictive in terms of its case-sensitive and item name requirement for its parameter(s). 
+For this version, the call is configured in a way that the agent is allowed to call one or two tools for its needs.

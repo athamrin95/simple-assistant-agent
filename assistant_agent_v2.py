@@ -16,27 +16,29 @@ anything else (e.g., general knowledge, weather, personal advice, or unrelated m
 politely refuse and redirect them to database items.
 
 # Available Tools
-- `list_items`: Returns a complete list of all database items, where each item contains a `name`
-and a `price`.
+- `list_items`: Returns a complete list of all database items, where each item contains a `lowercase name`,
+`name`, and `price`.
 - `count_total`: Calculates the combined total price for a given list of item names.
 
 # Operational Rules for `list_items`
 1. **Mandatory Tool Usage:** Whenever a user asks about database items, availability, comparisons,
 or individual prices (without calculation), you must call `list_items` to fetch the latest data.
 Do not guess or rely on prior assumptions.
-2. **Data Limitations:** Database items consist **only** of a `name` and a `price`. Do not invent
-extra attributes (such as stock quantities, descriptions, or categories) unless explicitly returned
- by the tool.
+2. **Data Limitations:** Database items consist **only** of 'lowercase name', `name` and `price` as 
+described in the available tools section. Do not invent extra attributes (such as stock quantities,
+descriptions, or categories) unless explicitly returned by the tool.
 3. **Communication Style:** Present prices clearly using clean bullet points or tables. If an item
 is missing from the database, clearly state that it is unavailable.
+4. **Tool response:** The tool response JSON structure will look like as follows:
+{"lowercase name": {"Name": Price}}
+Do not present the lowercase name to the user, simply use the associated name and price field.
 
 # Operational Rules for `count_total`
 1. **Mandatory Tool Usage:** Use `count_total` whenever the user asks for the combined total price
 of specific item(s) mentioned in their query. Always invoke the tool before formulating your
 response; do not guess or calculate prices manually.
-2. **Exact Naming & Case Sensitivity:** Pass the exact item names provided by the user into the
-`item_names` list argument. Note that item names are **case-sensitive** and must match the
-database keys precisely.
+2. **Item Names:** Pass the exact item names provided by the user into the `item_names` list argument.
+Do not adjust the spelling or letter case of these item names by yourself.
 3. **Handling Missing Items:** If the tool response indicates that any requested item was missing
 or not found, you must explicitly mention this in your final response to inform the user that
 those items were excluded from the total calculation.
@@ -52,7 +54,7 @@ TOOLS = [
         "name": "list_items",
         "description": (
             "Returns a complete list of all items currently stored in the database."
-            "Each item contains only two fields: `name` and `price`"
+            "Each item contains the following fields: `lowercase name`, `name`, and `price`"
         ),
         "parameters": {
             "type": "object",
@@ -81,13 +83,12 @@ TOOLS = [
     },
 ]
 
-# Let's have this be case-sensitive
 PSEUDO_DB = {
-    "Mouse nirkabel": 150000,
-    "Keyboard mekanik": 275000,
-    "Headset": 320000,
-    "Hub USB": 189000,
-    "Webcam": 410000,
+    "mouse nirkabel": {"Mouse nirkabel": 150000},
+    "keyboard mekanik": {"Keyboard mekanik": 275000},
+    "headset": {"Headset": 320000},
+    "hub usb": {"Hub USB": 189000},
+    "webcam": {"Webcam": 410000},
 }
 
 def list_items(db:dict) -> str:
@@ -97,8 +98,9 @@ def count_total(items:list) -> str:
     total = 0
     missing = []
     for item in items:
-        if PSEUDO_DB.get(item) is not None:
-            total += PSEUDO_DB[item] 
+        lowercase_item = item.casefold()
+        if PSEUDO_DB.get(lowercase_item) is not None:
+            total += next(iter(PSEUDO_DB[lowercase_item].values()))
         else:
             missing.append(item)
 
