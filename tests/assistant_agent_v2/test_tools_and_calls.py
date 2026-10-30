@@ -50,5 +50,19 @@ class TestToolsAndCalls(unittest.TestCase):
         )
         assert has_tool_output, "The input_list should record the function_call_output response."
 
+    def test_call_ai_direct_response_mocked(self):
+      mock_client = MagicMock()
+      direct_response_mock = MagicMock()
+      direct_response_mock.output = []
+      direct_response_mock.output_text = (
+          "Hello! I can only assist with database items."
+      )
+      mock_client.responses.create.return_value = direct_response_mock
+      input_list = [{"role": "user", "content": "What is the weather like?"}]
+
+      result = call_ai_with_tools(mock_client, input_list, "test-model")
+      assert "I can only assist with database items" in result
+      assert mock_client.responses.create.call_count == 1
+
 if __name__ == "__main__":
     unittest.main()

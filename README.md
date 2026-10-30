@@ -15,3 +15,8 @@ This current version of the script remembers your previously sent messages (as i
 For "assistant_agent_v2.py:<br>
 This script is pretty much the same as "assistant_agent.py", except that we've increased the scope of the tools it can use to more than just one.<br>
 For this version, the call is configured in a way that the agent is allowed to call one or two tools for its needs.
+
+For "assistant_agent_v3.py:<br>
+We've added several safeguards for this version. The agent is instructed to only do one round of function/tool call per user query. A safeguard is also added in case if the agent tried to initiate multiple tool calls.<br>
+We've also added a limit to the message history so the agent would remember only the two most recent queries to limit ballooning cost over protracted chat sessions.<br>
+We've also added a language instruction for the agent to only reply in Bahasa Indonesia.
