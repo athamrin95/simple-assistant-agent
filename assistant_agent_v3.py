@@ -202,7 +202,7 @@ def local_command(user_input:str, input_list:list):
 
     elif user_input == 'barang':
         db = json.loads(list_items(PSEUDO_DB))
-        for k, v in db.items():
+        for v in db.values():
             for key, value in v.items():
                 print(f"{key}: {value}")
 
