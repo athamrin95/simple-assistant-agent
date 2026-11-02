@@ -193,6 +193,8 @@ def trim_history(input_list:list, count_list:list) -> None:
     return None
 
 def local_command(user_input:str, input_list:list):
+    user_input = user_input[1:].casefold()
+
     if user_input == 'keluar':
         sys.exit(1)
     
@@ -205,6 +207,9 @@ def local_command(user_input:str, input_list:list):
         for v in db.values():
             for key, value in v.items():
                 print(f"{key}: {value}")
+
+    else:
+        print("Local command not recognized.")
 
 def main() -> None:
     load_dotenv()
@@ -223,7 +228,7 @@ def main() -> None:
         user_input = input("Please enter an input regarding the stuff in PSEUDO_DB: ")
         user_input = user_input.strip()
         if user_input[0] == '/':
-            local_command(user_input[1:].lower(), input_list)
+            local_command(user_input, input_list)
             continue
         if user_input == '':
             print(f"You've entered an empty command, please try again.")
