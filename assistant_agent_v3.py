@@ -192,6 +192,20 @@ def trim_history(input_list:list, count_list:list) -> None:
     del input_list[:count]
     return None
 
+def local_command(user_input:str, input_list:list):
+    if user_input == 'keluar':
+        sys.exit(1)
+    
+    elif user_input == 'history':
+        for entry in input_list:
+            print(f">>> {entry}")
+
+    elif user_input == 'barang':
+        db = json.loads(list_items(PSEUDO_DB))
+        for k, v in db.items():
+            for key, value in v.items():
+                print(f"{key}: {value}")
+
 def main() -> None:
     load_dotenv()
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
@@ -206,20 +220,17 @@ def main() -> None:
     input_list = []
     count_list = []
     while True:
-        user_input = input("Please enter an input regarding the stuff in PSEUDO_DB (Type 'keluar' to exit): ")
-        
-        if user_input.strip().lower() == 'keluar':
-            break
-        if user_input.strip() == '':
+        user_input = input("Please enter an input regarding the stuff in PSEUDO_DB: ")
+        user_input = user_input.strip()
+        if user_input[0] == '/':
+            local_command(user_input[1:].lower(), input_list)
+            continue
+        if user_input == '':
             print(f"You've entered an empty command, please try again.")
             continue
-        if user_input.strip() == "show history":
-            for history in input_list:
-                print(f">>> {history}")    
-            continue
-
         if len(count_list) > 2:
             trim_history(input_list, count_list)
+        
         result = call_ai_with_tools(client, input_list, user_input, count_list, openrouter_model)
         print(result)
 

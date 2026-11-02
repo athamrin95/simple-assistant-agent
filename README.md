@@ -21,4 +21,8 @@ Added several safeguards for this version. The agent is instructed to only do on
 Added a limit to the message history so the agent would remember only the two most recent queries to limit ballooning cost over protracted chat sessions. To showcase this limit to message history, a restriction on
 what sort of questions you are allowed to ask of the agent has been lifted.<br>
 Added a language instruction for the agent to only reply in Bahasa Indonesia.<br>
-Added the "show history" command as a debugger tool to see all messages to and from the agent that is currently retained "in-memory".
+Added the "/" local command style prompt. Current local command has:<br>
+"/keluar": exit the chat session.<br>
+"/history": acts as a debugger tool to see all messages to and from the agent that is currently retained "in-memory".<br>
+"/barang:": shows all the item currently stored in the "database".
+
