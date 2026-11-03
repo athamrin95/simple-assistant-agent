@@ -62,6 +62,11 @@ those items were excluded from the total calculation.
 is/are missing, then do not include the price in your final response.
 5. **A Singular Item:** If the user only supplies one item but is still asking for a total price
 then simply use this tool `count_total` instead of other tools.
+
+#Special Exception:
+For the purpose of this testing, if the user specifically asked for "Command A" in their initial query,
+do a function call of tool "list_items" first to get a list of items, and then do another function call
+of tool "count_total" for the item "Webcam" and return the final result to the user.
 """
 
 TOOLS = [
@@ -139,15 +144,15 @@ def call_ai_with_tools(client:OpenAI, input_list:list, user_input:str, count_lis
         temp_list = list(input_list)
         count = len(temp_list)
         temp_list.append({"role": "user", "content": user_input})
-        response = client.responses.create(
+        first_response = client.responses.create(
             model=openrouter_model,
             instructions=INSTRUCTIONS,
             input=temp_list,
             tools=TOOLS,
         )
-        temp_list += response.output
+        temp_list += first_response.output
         tools_called = False
-        for item in response.output:
+        for item in first_response.output:
             if item.type == "function_call":
                 tools_called = True
                 print(f"Tool {item.name} has been requested by the agent")
@@ -170,23 +175,41 @@ def call_ai_with_tools(client:OpenAI, input_list:list, user_input:str, count_lis
                     }
                 )
         if tools_called:
-            response = client.responses.create(
+            second_response_stream = client.responses.create(
                 model=openrouter_model,
                 instructions=INSTRUCTIONS,
                 input=temp_list,
                 tools=TOOLS,
+                stream = True,
             )
-            temp_list += response.output
-            tools_called_again = any(item.type == "function_call" for item in response.output)
-            if tools_called_again:
-                return "An error has occurred. It seems that your request is too complex to be completed all at once. Please try a simpler query."
+            response_collected = False
+            for event in second_response_stream:
+                if event.type == "response.output_item.added" and event.item.type == "function_call":
+                    return "An error has occurred. It seems that your request is too complex to be completed all at once. Please try a simpler query."
+
+                elif event.type == "response.output_text.delta":
+                    print(event.delta, end="", flush=True)
+
+                elif event.type == "response.completed":
+                    temp_list += event.response.output
+                    response_collected = True
+
+            print()
+            if not response_collected:
+                return "An error has occurred. It seems that the response from the agent has never reached completion status. Please retry your query again."
+            else:
+                return_this = ""
+
+        else:
+            return_this = first_response.output_text
 
         count = len(temp_list) - count
         input_list.clear()
         input_list.extend(temp_list)
         count_list.append(count)
-        return response.output_text
         
+        return return_this
+
     except Exception as e:
         return f"An error has occurred: {e}"
 
@@ -195,7 +218,7 @@ def trim_history(input_list:list, count_list:list) -> None:
     del input_list[:count]
     return None
 
-def local_command(user_input:str, input_list:list):
+def local_command(user_input:str, input_list:list, count_list:list):
     user_input = user_input[1:].casefold()
 
     if user_input == 'keluar':
@@ -207,6 +230,7 @@ def local_command(user_input:str, input_list:list):
         sys.exit(1)
     
     elif user_input == 'history':
+        print(f">>> {count_list}")
         for entry in input_list:
             print(f">>> {entry}")
 
@@ -219,6 +243,36 @@ def local_command(user_input:str, input_list:list):
     else:
         print("Local command not recognized.")
 
+def load_history_file(input_list:list, count_list:list):
+    try:
+        with Path(HISTORY_FILE_PATH).open("r", encoding="utf-8") as f:
+            for line in f:
+                input_list.append(json.loads(line))
+
+        role_check = False
+        for index, entry in enumerate(input_list):
+            if "role" in entry and entry["role"] == "user":
+                if not role_check:
+                    count = index
+                    role_check = True
+                else:
+                    raise Exception("Missing proper message sequence from file!")
+            elif "phase" in entry and entry["phase"] == "final_answer" :
+                if role_check:
+                    count_list.append(index + 1 - count)
+                    role_check = False
+                else:
+                    raise Exception("Missing proper message sequence from file!")
+
+        if role_check:
+            raise Exception("Missing proper message sequence from file!")
+
+        while len(count_list) > 2:
+            trim_history(input_list, count_list)
+            
+    except Exception as e:
+        print(f"An error has occurred. Unable to load {HISTORY_FILE_PATH}: {e}\nContinuing with an empty message history...")
+
 def main() -> None:
     load_dotenv()
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
@@ -230,29 +284,26 @@ def main() -> None:
         sys.exit(1)
 
     input_list = []
-    try:
-        with Path(HISTORY_FILE_PATH).open("r", encoding="utf-8") as f:
-            for line in f:
-                input_list.append(json.loads(line))
-    except Exception as e:
-        print(f"An error has occurred. Unable to load {HISTORY_FILE_PATH}: {e}\nContinuing with an empty message history...")
+    count_list = []
+    load_history_file(input_list, count_list)
 
     client = OpenAI(api_key=openrouter_api_key, base_url=openrouter_base_url)
-    count_list = []
     while True:
         user_input = input("Please enter an input regarding the stuff in PSEUDO_DB: ")
         user_input = user_input.strip()
         if user_input[0] == '/':
-            local_command(user_input, input_list)
+            local_command(user_input, input_list, count_list)
             continue
         if user_input == '':
             print(f"You've entered an empty command, please try again.")
             continue
-        if len(count_list) > 2:
-            trim_history(input_list, count_list)
         
         result = call_ai_with_tools(client, input_list, user_input, count_list, openrouter_model)
-        print(result)
+        if result:
+            print(result)
+        
+        while len(count_list) > 2:
+            trim_history(input_list, count_list)
 
 
 if __name__ == "__main__":

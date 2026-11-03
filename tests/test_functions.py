@@ -9,6 +9,7 @@ from assistant_agent import (
     count_total,
     local_command,
     trim_history,
+    load_history_file,
 )
 
 
@@ -56,7 +57,7 @@ class TestFunctions(unittest.TestCase):
 
         with patch("assistant_agent.HISTORY_FILE_PATH", self.test_file_path):
             with self.assertRaises(SystemExit) as cm:
-                local_command("/keluar", input_list)
+                local_command("/keluar", input_list, [])
             
             self.assertEqual(cm.exception.code, 1)
 
@@ -100,6 +101,54 @@ class TestFunctions(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             with open(non_existent_file, "r") as f:
                 pass
+
+    def test_load_history_file_success(self):
+        sample_entries = [
+            {"role": "user", "content": "List barang"},
+            {"role": "assistant", "content": "Berikut daftar barang..."},
+            {"phase": "final_answer", "content": "Done"}
+        ]
+
+        with open(self.test_file_path, "w", encoding="utf-8") as f:
+            for entry in sample_entries:
+                f.write(json.dumps(entry) + "\n")
+
+        input_list = []
+        count_list = []
+        with patch("assistant_agent.HISTORY_FILE_PATH", self.test_file_path):
+            load_history_file(input_list, count_list)
+
+        self.assertEqual(len(input_list), 3)
+        self.assertEqual(input_list, sample_entries)
+        self.assertEqual(count_list, [3])
+
+    def test_load_history_file_invalid_sequence(self):
+        sample_entries = [
+            {"role": "user", "content": "List barang"},
+            {"role": "user", "content": "Another user message without final answer"}
+        ]
+
+        with open(self.test_file_path, "w", encoding="utf-8") as f:
+            for entry in sample_entries:
+                f.write(json.dumps(entry) + "\n")
+
+        input_list = []
+        count_list = []
+        with patch("assistant_agent.HISTORY_FILE_PATH", self.test_file_path):
+            load_history_file(input_list, count_list)
+
+        # Exception caught internally and handled gracefully, leaving count_list empty
+        self.assertEqual(count_list, [])
+
+    def test_load_history_file_nonexistent(self):
+        non_existent_file = os.path.join(self.temp_dir.name, "non_existent.json")
+        input_list = []
+        count_list = []
+        with patch("assistant_agent.HISTORY_FILE_PATH", non_existent_file):
+            load_history_file(input_list, count_list)
+
+        self.assertEqual(input_list, [])
+        self.assertEqual(count_list, [])
 
 if __name__ == "__main__":
     unittest.main()

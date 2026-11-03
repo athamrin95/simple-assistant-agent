@@ -7,6 +7,12 @@ Rename the file ".env.example" to ".env" and fill in OPENROUTER_API_KEY with you
 You may change the AI model with a different one that's available in OpenRouter by changing the value of OPENROUTER_MODEL
 
 Changelog:
+- Version 5:<br>
+Changed the second response for the function call section to use stream so the final answer can be shown to the user as soon as possible without
+waiting for the complete message to be fully received from response call (only applicable for tool call related queries).<br>
+Fixed a bug/oversight where messages are loaded from the file "riwayat.json" and it is not properly counted, allowing for the limit placed on the max
+number of messages saved to be bypassed.<br>
+
 - Version 4:<br>
 Added the feature to save the state of the message history to an external file called "riwayat.json" when user exits the script by typing "/keluar".<br>
 The script will attempt to load back in the saved messages from "riwayat.json" during startup. This would result in the agent still remembering

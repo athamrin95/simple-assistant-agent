@@ -1,6 +1,7 @@
+import io
 import json
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 import pytest
 
 from assistant_agent import (
@@ -31,26 +32,32 @@ class TestToolsAndCalls(unittest.TestCase):
         first_response_mock = MagicMock()
         first_response_mock.output = [mock_tool_call]
 
-        second_response_mock = MagicMock()
-        second_response_mock.output = []
-        second_response_mock.output_text = (
-            "Total price for Mouse nirkabel is 150.000."
-        )
+        event_delta = MagicMock()
+        event_delta.type = "response.output_text.delta"
+        event_delta.delta = "Total price for Mouse nirkabel is 150.000."
+
+        event_completed = MagicMock()
+        event_completed.type = "response.completed"
+        event_completed.response = MagicMock(output=[])
+
+        second_response_stream = [event_delta, event_completed]
 
         mock_client.responses.create.side_effect = [
             first_response_mock,
-            second_response_mock,
+            second_response_stream,
         ]
 
         input_list = []
         count_list = []
         user_input = "What is the total price for Mouse nirkabel?"
 
-        result = call_ai_with_tools(
-            mock_client, input_list, user_input, count_list, "test-model"
-        )
+        captured_output = io.StringIO()
+        with patch("sys.stdout", new=captured_output):
+            result = call_ai_with_tools(
+                mock_client, input_list, user_input, count_list, "test-model"
+            )
 
-        assert "150.000" in result
+        assert "150.000" in captured_output.getvalue()
         assert mock_client.responses.create.call_count == 2
         assert len(count_list) == 1
         has_tool_output = any(
@@ -98,10 +105,13 @@ class TestToolsAndCalls(unittest.TestCase):
         first_response = MagicMock()
         first_response.output = [tool_call_1]
 
-        second_response = MagicMock()
-        second_response.output = [tool_call_2]
+        event_error = MagicMock()
+        event_error.type = "response.output_item.added"
+        event_error.item = tool_call_2
 
-        mock_client.responses.create.side_effect = [first_response, second_response]
+        second_response_stream = [event_error]
+
+        mock_client.responses.create.side_effect = [first_response, second_response_stream]
 
         input_list = []
         count_list = []
@@ -142,10 +152,14 @@ class TestToolsAndCalls(unittest.TestCase):
         tool_call_2.name = "count_total"
         tool_call_2.call_id = "call_2"
         tool_call_2.arguments = json.dumps({"item_names": ["Mouse nirkabel"]})
-        second_response = MagicMock()
-        second_response.output = [tool_call_2]
 
-        mock_client.responses.create.side_effect = [first_response, second_response]
+        event_error = MagicMock()
+        event_error.type = "response.output_item.added"
+        event_error.item = tool_call_2
+
+        second_response_stream = [event_error]
+
+        mock_client.responses.create.side_effect = [first_response, second_response_stream]
 
         initial_input_list = [{"role": "user", "content": "Initial history"}]
         input_list_copy = list(initial_input_list)
