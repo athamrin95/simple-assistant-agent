@@ -1,35 +1,67 @@
 import json
 import os
+from pathlib import Path
 import sys
 from openai import OpenAI
 from dotenv import load_dotenv
 
 INSTRUCTIONS = """\
-# Role and Persona
-You are a specialized database assistant agent. Your sole purpose is to help the user find
-information about items stored in the internal database. You must be concise, accurate, and
+# Role & Persona
+You are a specialized database assistant agent. Your sole purpose is to help users find information
+and calculate totals for items stored in the internal database. You must be concise, accurate, and
 helpful while strictly adhering to your operational constraints.
 
-# Tools Available
-You have access to exactly one tool:
-- `list_items`: Returns a complete list of all items currently stored in the database. Each
-item contains only two fields: `name` and `price`.
+# Language Requirement
+Give your final response to the user in Bahasa Indonesia
 
-# Operational Rules
-1. **Database-Only Scope:** You can *only* answer questions about the items returned by the
-`list_items` tool. If the user asks about anything else (e.g., general knowledge, personal advice,
-weather, math problems unrelated to the items), politely refuse and redirect them to ask about the
-database items.
-2. **Mandatory Tool Usage:** Whenever a user asks a question about database items, prices,
-availability, or comparisons, you must call the `list_items` tool to retrieve the latest data
-before formulating your response. Do not guess or rely on prior assumptions about what is in the
-database.
-3. **Data Limitations:** Remember that items retrieved from the database consist **only** of a
-`name` and a `price`. Do not invent or assume other attributes (such as stock quantity,
-descriptions, categories, or SKUs) unless they are explicitly present in the tool's return value.
-4. **Communication Style:** Present prices clearly and format lists cleanly (using bullet points
-or tables where appropriate). If an item requested by the user is not found in the database,
-clearly state that it is not available.
+# Scope & General Rule
+Your main purpose is to answer questions about the items stored in the database that you can retrieve via
+the provided tools.
+If a user asks about anything else (e.g., general knowledge, weather, personal advice,
+or unrelated math problems), you are generally allowed to answer their question, but you should also gently
+nudge or redirect them if they have any questions regarding the database items.
+
+# Tool Call Limits & Execution Flow
+1. **Single Tool Round Limit:** You are strictly allowed to call tools **only once per user request**.
+You MUST NOT make multiple sequential tool calls or chain tool calls back-to-back.
+2. **Partial Requests & Limitations:** If a user request requires multiple sequential or chained
+tool calls that you cannot fulfill within a single tool round, you must call the most relevant tool,
+answer what you can from that data (only from the newly retrieved data, do not guess or rely on prior
+assumptions/data), and **explicitly inform the user** that you are unable to complete the rest of
+their request due to operational limitations (do not mention tool limit) and that they should try asking
+again in a simpler query.
+
+# Available Tools
+- `list_items`: Returns a complete list of all database items, where each item contains a `lowercase name`,
+`name`, and `price`.
+- `count_total`: Calculates the combined total price for a given list of item names.
+
+# Operational Rules for `list_items`
+1. **Mandatory Tool Usage:** Whenever a user asks about database items, availability, comparisons,
+or individual prices (without calculation), you must call `list_items` to fetch the latest data.
+Do not guess or rely on prior assumptions.
+2. **Data Limitations:** Database items consist **only** of 'lowercase name', `name` and `price` as 
+described in the available tools section. Do not invent extra attributes (such as stock quantities,
+descriptions, or categories) unless explicitly returned by the tool.
+3. **Communication Style:** Present prices clearly using clean bullet points or tables. If an item
+is missing from the database, clearly state that it is unavailable.
+4. **Tool response:** The tool response JSON structure will look like as follows:
+{"lowercase name": {"Name": Price}}
+Do not present the lowercase name to the user, simply use the associated name and price field.
+
+# Operational Rules for `count_total`
+1. **Mandatory Tool Usage:** Use `count_total` whenever the user asks for the combined total price
+of specific item(s) mentioned in their query. Always invoke the tool before formulating your
+response; do not guess or calculate prices manually.
+2. **Item Names:** Pass the exact item names provided by the user into the `item_names` list argument.
+Do not adjust the spelling or letter case of these item names by yourself.
+3. **Handling Missing Items:** If the tool response indicates that any requested item was missing
+or not found, you must explicitly mention this in your final response to inform the user that
+those items were excluded from the total calculation.
+4. **Zero Total Price:** If the total price is 0 because all of the item(s) requested by the user
+is/are missing, then do not include the price in your final response.
+5. **A Singular Item:** If the user only supplies one item but is still asking for a total price
+then simply use this tool `count_total` instead of other tools.
 """
 
 TOOLS = [
@@ -38,25 +70,62 @@ TOOLS = [
         "name": "list_items",
         "description": (
             "Returns a complete list of all items currently stored in the database."
-            "Each item contains only two fields: `name` and `price`"
+            "Each item contains the following fields: `lowercase name`, `name`, and `price`"
         ),
         "parameters": {
             "type": "object",
             "properties": {},
         },
     },
+    {
+        "type": "function",
+        "name": "count_total",
+        "description": (
+            "Calculate the total price for a list of specified item names."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "item_names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "A list of item names to calculate the total price for."
+                    ),
+                }
+            },
+            "required": ["item_names"],
+        },
+    },
 ]
 
 PSEUDO_DB = {
-    "Mouse nirkabel": 150000,
-    "Keyboard mekanik": 90000,#275000,
-    "Headset": 320000,
-    "Hub USB": 189000,
-    "Webcam": 410000,
+    "mouse nirkabel": {"Mouse nirkabel": 150000},
+    "keyboard mekanik": {"Keyboard mekanik": 275000},
+    "headset": {"Headset": 320000},
+    "hub usb": {"Hub USB": 189000},
+    "webcam": {"Webcam": 410000},
 }
+
+HISTORY_FILE_PATH = "riwayat.json"
 
 def list_items(db:dict) -> str:
     return json.dumps(db)
+
+def count_total(items:list) -> str:
+    total = 0
+    missing = []
+    for item in items:
+        lowercase_item = item.casefold()
+        if PSEUDO_DB.get(lowercase_item) is not None:
+            total += next(iter(PSEUDO_DB[lowercase_item].values()))
+        else:
+            missing.append(item)
+
+    result = f"Total price is {total}."
+    if missing:
+        result += (f" But the following item(s) is/are missing: {", ".join(missing)}")
+    return result
 
 def check_env(api_key:str, base_url:str, model:str) -> str:
     """Returns None if .env is loaded properly and the necessary properties are present."""
@@ -65,36 +134,90 @@ def check_env(api_key:str, base_url:str, model:str) -> str:
     else:
         return None
 
-def call_ai_with_tools(client:OpenAI, input_list:list, openrouter_model:str) -> str:
+def call_ai_with_tools(client:OpenAI, input_list:list, user_input:str, count_list:str, openrouter_model:str) -> str:
     try:
+        temp_list = list(input_list)
+        count = len(temp_list)
+        temp_list.append({"role": "user", "content": user_input})
         response = client.responses.create(
             model=openrouter_model,
             instructions=INSTRUCTIONS,
-            input=input_list,
+            input=temp_list,
             tools=TOOLS,
         )
-        input_list += response.output
+        temp_list += response.output
+        tools_called = False
         for item in response.output:
             if item.type == "function_call":
+                tools_called = True
+                print(f"Tool {item.name} has been requested by the agent")
                 if item.name == "list_items":
-                    input_list.append(
-                        {
-                            "type": "function_call_output",
-                            "call_id": item.call_id,
-                            "output": list_items(PSEUDO_DB),
-                        }
-                    )
+                    tool_output = list_items(PSEUDO_DB)
 
-        response = client.responses.create(
-            model=openrouter_model,
-            instructions=INSTRUCTIONS,
-            input=input_list,
-            tools=TOOLS,
-        )
+                elif item.name == "count_total":
+                    items = json.loads(item.arguments)["item_names"]
+                    tool_output = count_total(items)
+                
+                else:
+                    tool_output = json.dumps({
+                        "error": f"Tool '{item.name}' does not exist."
+                    })
+                temp_list.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": item.call_id,
+                        "output": tool_output,
+                    }
+                )
+        if tools_called:
+            response = client.responses.create(
+                model=openrouter_model,
+                instructions=INSTRUCTIONS,
+                input=temp_list,
+                tools=TOOLS,
+            )
+            temp_list += response.output
+            tools_called_again = any(item.type == "function_call" for item in response.output)
+            if tools_called_again:
+                return "An error has occurred. It seems that your request is too complex to be completed all at once. Please try a simpler query."
+
+        count = len(temp_list) - count
+        input_list.clear()
+        input_list.extend(temp_list)
+        count_list.append(count)
         return response.output_text
         
     except Exception as e:
-        return f"An error occurred: {e}"
+        return f"An error has occurred: {e}"
+
+def trim_history(input_list:list, count_list:list) -> None:
+    count = count_list.pop(0)
+    del input_list[:count]
+    return None
+
+def local_command(user_input:str, input_list:list):
+    user_input = user_input[1:].casefold()
+
+    if user_input == 'keluar':
+        with open(HISTORY_FILE_PATH, "w", encoding="utf-8") as f:
+            for entry in input_list:
+                if hasattr(entry, "model_dump"):
+                    entry = entry.model_dump()
+                f.write(json.dumps(entry) + "\n")
+        sys.exit(1)
+    
+    elif user_input == 'history':
+        for entry in input_list:
+            print(f">>> {entry}")
+
+    elif user_input == 'barang':
+        db = json.loads(list_items(PSEUDO_DB))
+        for v in db.values():
+            for key, value in v.items():
+                print(f"{key}: {value}")
+
+    else:
+        print("Local command not recognized.")
 
 def main() -> None:
     load_dotenv()
@@ -106,17 +229,29 @@ def main() -> None:
         print(result)
         sys.exit(1)
 
-    client = OpenAI(api_key=openrouter_api_key, base_url=openrouter_base_url)
     input_list = []
+    try:
+        with Path(HISTORY_FILE_PATH).open("r", encoding="utf-8") as f:
+            for line in f:
+                input_list.append(json.loads(line))
+    except Exception as e:
+        print(f"An error has occurred. Unable to load {HISTORY_FILE_PATH}: {e}")
+
+    client = OpenAI(api_key=openrouter_api_key, base_url=openrouter_base_url)
+    count_list = []
     while True:
-        user_input = input("Please enter an input regarding the stuff in PSEUDO_DB (Type 'keluar' to exit): ")
-        if user_input.strip().lower() == 'keluar':
-            break
-        if user_input.strip() == '':
+        user_input = input("Please enter an input regarding the stuff in PSEUDO_DB: ")
+        user_input = user_input.strip()
+        if user_input[0] == '/':
+            local_command(user_input, input_list)
+            continue
+        if user_input == '':
             print(f"You've entered an empty command, please try again.")
             continue
-        input_list.append({"role": "user", "content": user_input})
-        result = call_ai_with_tools(client, input_list, openrouter_model)
+        if len(count_list) > 2:
+            trim_history(input_list, count_list)
+        
+        result = call_ai_with_tools(client, input_list, user_input, count_list, openrouter_model)
         print(result)
 
 

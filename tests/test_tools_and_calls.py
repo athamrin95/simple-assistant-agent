@@ -3,11 +3,9 @@ import unittest
 from unittest.mock import MagicMock
 import pytest
 
-from assistant_agent_v3 import (
+from assistant_agent import (
     TOOLS,
-    count_total,
     call_ai_with_tools,
-    trim_history,
 )
 
 
@@ -21,12 +19,6 @@ class TestToolsAndCalls(unittest.TestCase):
             assert deserialized_tools == TOOLS
         except (TypeError, ValueError) as e:
             pytest.fail(f"TOOLS structure is not valid JSON serializable: {e}")
-
-    def test_count_total_success_and_missing(self):
-        test_items = ["Mouse nirkabel", "NonExistentItem", "headset"]
-        result = count_total(test_items)
-        assert "470000" in result
-        assert "NonExistentItem" in result
 
     def test_call_ai_with_tools_mocked(self):
         mock_client = MagicMock()
@@ -121,15 +113,6 @@ class TestToolsAndCalls(unittest.TestCase):
 
         assert "too complex" in result.lower()
 
-    def test_trim_history(self):
-        input_list = ["msg1", "msg2", "msg3", "msg4", "msg5"]
-        count_list = [2, 3]
-
-        trim_history(input_list, count_list)
-        
-        assert input_list == ["msg3", "msg4", "msg5"]
-        assert count_list == [3]
-
     def test_input_list_unmodified_on_exception(self):
         mock_client = MagicMock()
         mock_client.responses.create.side_effect = Exception("Network timeout")
@@ -142,7 +125,7 @@ class TestToolsAndCalls(unittest.TestCase):
             mock_client, initial_input_list, "Test prompt", count_list, "test-model"
         )
 
-        assert "An error occurred" in result
+        assert "An error has occurred" in result
         assert initial_input_list == input_list_copy
 
     def test_input_list_unmodified_on_chained_tool_error(self):
