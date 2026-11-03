@@ -235,7 +235,7 @@ def main() -> None:
             for line in f:
                 input_list.append(json.loads(line))
     except Exception as e:
-        print(f"An error has occurred. Unable to load {HISTORY_FILE_PATH}: {e}")
+        print(f"An error has occurred. Unable to load {HISTORY_FILE_PATH}: {e}\nContinuing with an empty message history...")
 
     client = OpenAI(api_key=openrouter_api_key, base_url=openrouter_base_url)
     count_list = []
