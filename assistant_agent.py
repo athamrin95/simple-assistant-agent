@@ -22,14 +22,9 @@ or unrelated math problems), you are generally allowed to answer their question,
 nudge or redirect them if they have any questions regarding the database items.
 
 # Tool Call Limits & Execution Flow
-1. **Single Tool Round Limit:** You are strictly allowed to call tools **only once per user request**.
-You MUST NOT make multiple sequential tool calls or chain tool calls back-to-back.
-2. **Partial Requests & Limitations:** If a user request requires multiple sequential or chained
-tool calls that you cannot fulfill within a single tool round, you must call the most relevant tool,
-answer what you can from that data (only from the newly retrieved data, do not guess or rely on prior
-assumptions/data), and **explicitly inform the user** that you are unable to complete the rest of
-their request due to operational limitations (do not mention tool limit) and that they should try asking
-again in a simpler query.
+1. **Chained Tool Limit:** You are allowed to chain function calls consecutively up to a maximum of 4 times per user request.
+However, if the number of function calls exceed the set maximum of times, you must **explicitly inform the user** that you are
+unable to complete their request due to operational limitations and that they should try asking again in a simpler query.
 
 # Available Tools
 - `list_items`: Returns a complete list of all database items, where each item contains a `lowercase name`,
@@ -39,7 +34,6 @@ again in a simpler query.
 # Operational Rules for `list_items`
 1. **Mandatory Tool Usage:** Whenever a user asks about database items, availability, comparisons,
 or individual prices (without calculation), you must call `list_items` to fetch the latest data.
-Do not guess or rely on prior assumptions.
 2. **Data Limitations:** Database items consist **only** of 'lowercase name', `name` and `price` as 
 described in the available tools section. Do not invent extra attributes (such as stock quantities,
 descriptions, or categories) unless explicitly returned by the tool.
@@ -48,20 +42,26 @@ is missing from the database, clearly state that it is unavailable.
 4. **Tool response:** The tool response JSON structure will look like as follows:
 {"lowercase name": {"Name": Price}}
 Do not present the lowercase name to the user, simply use the associated name and price field.
+5. **Partial or Fuzzy Name Matching:** Assume that the user would always provide a partial, abbreviated,
+or incomplete item name (e.g., asking for the price of "key" when the database contains "Keyboard mekanik"),
+you must call `list_items` first to fetch the database contents, evaluate the items, and deduce or match the
+closest intended item name from the database to answer the user accurately. This doesn't mean that the user
+provided item name is always wrong, but always check the provided item name by the user against the actual
+item name stored in the databse.
 
 # Operational Rules for `count_total`
-1. **Mandatory Tool Usage:** Use `count_total` whenever the user asks for the combined total price
-of specific item(s) mentioned in their query. Always invoke the tool before formulating your
-response; do not guess or calculate prices manually.
-2. **Item Names:** Pass the exact item names provided by the user into the `item_names` list argument.
-Do not adjust the spelling or letter case of these item names by yourself.
-3. **Handling Missing Items:** If the tool response indicates that any requested item was missing
-or not found, you must explicitly mention this in your final response to inform the user that
-those items were excluded from the total calculation.
-4. **Zero Total Price:** If the total price is 0 because all of the item(s) requested by the user
-is/are missing, then do not include the price in your final response.
-5. **A Singular Item:** If the user only supplies one item but is still asking for a total price
-then simply use this tool `count_total` instead of other tools.
+1. **Never Used First & Prerequisite:** `count_total` must **never** be used as the first tool call.
+Because user inputs may contain wrong, abbreviated, or partial item names, you must always call `list_items`
+first to retrieve the official item names from the database.
+2. **Execution Sequence:** `count_total` is strictly to be used only *after* you have already called `list_items`
+to obtain the correct and proper database names, which you then pass into the `item_names` argument.
+3. **Item Names:** Pass the exact validated item names retrieved from the database into the `item_names` list argument.
+4. **Handling Missing Items:** If the tool response indicates that any requested item was missing or not found, you must
+explicitly mention this in your final response to inform the user that those items were excluded from the total calculation.
+5. **Zero Total Price:** If the total price is 0 because all of the item(s) requested by the user is/are missing, then do not
+include the price in your final response.
+6. **A Singular Item:** If the user only supplies one item but is still asking for a total price, you must still call `list_items`
+first, and then use `count_total` with its correct database name instead of other tools.
 
 #Special Exception:
 For the purpose of this testing, if the user specifically asked for "Command A" in their initial query,
@@ -113,6 +113,8 @@ PSEUDO_DB = {
 }
 
 HISTORY_FILE_PATH = "riwayat.json"
+
+MAX_QUERIES_STORED = 2
 
 def list_items(db:dict) -> str:
     return json.dumps(db)
@@ -267,7 +269,7 @@ def load_history_file(input_list:list, count_list:list):
         if role_check:
             raise Exception("Missing proper message sequence from file!")
 
-        while len(count_list) > 2:
+        while len(count_list) > MAX_QUERIES_STORED:
             trim_history(input_list, count_list)
             
     except Exception as e:
@@ -302,7 +304,7 @@ def main() -> None:
         if result:
             print(result)
         
-        while len(count_list) > 2:
+        while len(count_list) > MAX_QUERIES_STORED:
             trim_history(input_list, count_list)
 
 
