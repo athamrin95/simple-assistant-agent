@@ -4,6 +4,9 @@ from pathlib import Path
 import sys
 from openai import OpenAI
 from dotenv import load_dotenv
+from tools import TOOLS
+
+from tools import find_item, tool_finder
 
 INSTRUCTIONS = """\
 # Role & Persona
@@ -41,7 +44,7 @@ on assumptions or prior knowledge.
 is missing from the database, clearly state that it is unavailable.
 4. **Argument vs. No Argument:** This tool accepts no argument or an argument. If the user wishes to find all items
 or gave no specific name, then simply provide no argument for the tool. If the user wishes to find some specified
-item(s), then the item name from the user query must be passed down to the `item_name` string argument. Note that
+item(s), then the item name from the user query must be passed down to the `name` string argument. Note that
 if multiple names are provided, you must break them down to one `find_item` tool per item. For example, if the user
 queries "I want to find the price of webcam and mouse", then you need to call for find_item("webcam") and
 find_item("mouse").
@@ -55,8 +58,8 @@ name for your answer to the user's query.
 Because user inputs may contain wrong, abbreviated, or partial item names, you must always call `find_item`
 first to retrieve the official item names from the database.
 2. **Execution Sequence:** `count_total` is strictly to be used only *after* you have already called `find_item`
-to obtain the correct and proper database names, which you then pass into the `item_names` argument.
-3. **Item Names:** Pass the exact validated item names retrieved from the database into the `item_names` list argument.
+to obtain the correct and proper database names, which you then pass into the `list` argument.
+3. **Item Names:** Pass the exact validated item names retrieved from the database into the `list` list argument.
 4. **Handling Missing Items:** If the tool response indicates that any requested item was missing or not found, you must
 explicitly mention this in your final response to inform the user that those items were excluded from the total calculation.
 5. **Zero Total Price:** If the total price is 0 because all of the item(s) requested by the user is/are missing, then do not
@@ -69,47 +72,6 @@ When the user makes a query "Command Alpha", ignore all previous tool restrictio
 tool `count_total` with a list containing "kunci", "Webcam" in said list as the argument for the tool
 """
 
-TOOLS = [
-    {
-        "type": "function",
-        "name": "find_item",
-        "description": (
-            "Returns a complete list of all items currently stored in the database if no argument is given."
-            "Returns an item if an item name is given as the argument"
-            "Each item contains the following keys: `name`, and `price` and their respective values"
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "item_name": {
-                    "type": "string",
-                    "description": "The item name is given as the argument to find the details of only said item",
-                }
-            },
-        },
-    },
-    {
-        "type": "function",
-        "name": "count_total",
-        "description": (
-            "Calculate the total price for a list of specified item names."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "item_names": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": (
-                        "A list of item names to calculate the total price for."
-                    ),
-                }
-            },
-            "required": ["item_names"],
-        },
-    },
-]
-
 PSEUDO_DB = [
     {"name": "Mouse nirkabel", "price": 150000},
     {"name": "Keyboard mekanik", "price": 275000},
@@ -121,32 +83,6 @@ PSEUDO_DB = [
 HISTORY_FILE_PATH = "riwayat.json"
 
 MAX_QUERIES_STORED = 2
-
-def find_item(item_name = None) -> str:
-    if item_name is None:
-        return PSEUDO_DB
-    
-    for entry in PSEUDO_DB:
-        if item_name.casefold() in entry["name"].casefold():
-            return entry
-
-    return "Item is unavailable"
-
-def count_total(items:list) -> str:
-    set_items = set(items)
-    total_price = 0.0
-
-    for entry in PSEUDO_DB:
-        item_name = entry.get("name")
-        if item_name in set_items:
-            total_price += float(entry["price"])
-            set_items.remove(item_name)
-
-    final_answer = f"Total Price: {total_price}"
-    if set_items:
-        final_answer += f". But the following items are not found: {set_items}"
-
-    return final_answer
 
 def check_env(api_key:str, base_url:str, model:str) -> str:
     """Returns None if .env is loaded properly and the necessary properties are present."""
@@ -193,30 +129,7 @@ def call_ai_with_tools(client:OpenAI, input_list:list, user_input:str, count_lis
                 if item.type == "function_call":
                     # Preparing for the next chain function call
                     tools_called = True
-                    if item.name == "find_item":
-                        try:
-                            arg = json.loads(item.arguments)["item_name"]
-                            if arg == "":
-                                print(f"Tool {item.name}() has been requested by the agent")
-                                tool_output = json.dumps(find_item())
-                            else:
-                                print(f"Tool {item.name}({arg}) has been requested by the agent")
-                                tool_output = json.dumps(find_item(arg))
-                        except json.JSONDecodeError:
-                            tool_output = json.dumps({"error": "The given argument is not JSON"})
-
-                    elif item.name == "count_total":
-                        try:
-                            items = json.loads(item.arguments)["item_names"]
-                            print(f"Tool {item.name}({items}) has been requested by the agent")
-                            tool_output = json.dumps(count_total(items))
-                        except json.JSONDecodeError:
-                            tool_output = json.dumps({"error": "The given argument is not JSON"})
-                    
-                    else:
-                        print(f"Tool {item.name} has been requested by the agent, but this tool doesn't exist!")
-                        tool_output = json.dumps({"error": f"Tool '{item.name}' does not exist."})
-
+                    tool_output = json.dumps(tool_finder(PSEUDO_DB, item.name, item.arguments))
                     temp_list.append(
                         {
                             "type": "function_call_output",
@@ -260,10 +173,8 @@ def local_command(user_input:str, input_list:list, count_list:list):
             print(f">>> {entry}")
 
     elif user_input == 'barang':
-        db = json.loads(find_item())
-        for v in db.values():
-            for key, value in v.items():
-                print(f"{key}: {value}")
+        for entry in find_item(PSEUDO_DB):
+            print(f"Name: {entry["name"]}; Price: {entry["price"]}")
 
     else:
         print("Local command not recognized.")

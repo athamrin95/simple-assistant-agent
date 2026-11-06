@@ -7,6 +7,11 @@ Rename the file ".env.example" to ".env" and fill in OPENROUTER_API_KEY with you
 You may change the AI model with a different one that's available in OpenRouter by changing the value of OPENROUTER_MODEL
 
 Changelog:
+- Version 7:<br>
+Separated the tools available for the agent to use into its own file "tools.py".<br>
+Streamlined the code logic in determining what tools the agent is requesting.<br>
+Fixed a bug/oversight caused from the local command '/barang' due to changing PSEUDO_DB type from dict to list.<br>
+
 - Version 6:<br>
 Changed how the existing tools work (find_item and count_total) to fit with the new database structure and requirements.<br>
 Agent is now allowed to repeatedly chain function/tool calls up to a maximum of 4 times per user query.<br>

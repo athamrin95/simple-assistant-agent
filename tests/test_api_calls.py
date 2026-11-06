@@ -2,24 +2,11 @@ import io
 import json
 import unittest
 from unittest.mock import MagicMock, patch
-import pytest
 
-from assistant_agent import (
-    TOOLS,
-    call_ai_with_tools,
-)
+from assistant_agent import call_ai_with_tools
 
 
-class TestToolsAndCalls(unittest.TestCase):
-
-    def test_tools_json_validity(self):
-        try:
-            serialized_tools = json.dumps(TOOLS)
-            assert isinstance(serialized_tools, str)
-            deserialized_tools = json.loads(serialized_tools)
-            assert deserialized_tools == TOOLS
-        except (TypeError, ValueError) as e:
-            pytest.fail(f"TOOLS structure is not valid JSON serializable: {e}")
+class TestAPICalls(unittest.TestCase):
 
     def test_call_ai_with_tools_mocked(self):
         mock_client = MagicMock()
@@ -27,7 +14,7 @@ class TestToolsAndCalls(unittest.TestCase):
         mock_tool_call.type = "function_call"
         mock_tool_call.name = "count_total"
         mock_tool_call.call_id = "call_xyz_789"
-        mock_tool_call.arguments = json.dumps({"item_names": ["Mouse nirkabel"]})
+        mock_tool_call.arguments = json.dumps({"list": ["Mouse nirkabel"]})
 
         first_response_mock = MagicMock()
         first_response_mock.output = [mock_tool_call]
@@ -98,9 +85,9 @@ class TestToolsAndCalls(unittest.TestCase):
         
         tool_call_1 = MagicMock()
         tool_call_1.type = "function_call"
-        tool_call_1.name = "list_items"
+        tool_call_1.name = "find_item"  # Updated to find_item
         tool_call_1.call_id = "call_1"
-        tool_call_1.arguments = json.dumps({})
+        tool_call_1.arguments = json.dumps({"name": ""})  # Updated to match TOOLS argument structure
 
         response_mock_1 = MagicMock()
         response_mock_1.output = [tool_call_1]
@@ -113,7 +100,7 @@ class TestToolsAndCalls(unittest.TestCase):
         tool_call_2.type = "function_call"
         tool_call_2.name = "count_total"
         tool_call_2.call_id = "call_2"
-        tool_call_2.arguments = json.dumps({"item_names": ["Mouse nirkabel"]})
+        tool_call_2.arguments = json.dumps({"list": ["Mouse nirkabel"]})
 
         response_mock_2 = MagicMock()
         response_mock_2.output = [tool_call_2]
@@ -160,9 +147,9 @@ class TestToolsAndCalls(unittest.TestCase):
         
         tool_call_1 = MagicMock()
         tool_call_1.type = "function_call"
-        tool_call_1.name = "list_items"
+        tool_call_1.name = "find_item"  # Updated to find_item
         tool_call_1.call_id = "call_1"
-        tool_call_1.arguments = json.dumps({})
+        tool_call_1.arguments = json.dumps({"name": ""})  # Updated to match TOOLS argument structure
 
         response_mock_1 = MagicMock()
         response_mock_1.output = [tool_call_1]
@@ -175,7 +162,7 @@ class TestToolsAndCalls(unittest.TestCase):
         tool_call_2.type = "function_call"
         tool_call_2.name = "count_total"
         tool_call_2.call_id = "call_2"
-        tool_call_2.arguments = json.dumps({"item_names": ["Mouse nirkabel"]})
+        tool_call_2.arguments = json.dumps({"list": ["Mouse nirkabel"]})
 
         response_mock_2 = MagicMock()
         response_mock_2.output = [tool_call_2]

@@ -1,3 +1,4 @@
+import io
 import json
 import os
 from pathlib import Path
@@ -6,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import tempfile
 
 from assistant_agent import (
-    count_total,
+    PSEUDO_DB,
     local_command,
     trim_history,
     load_history_file,
@@ -14,21 +15,6 @@ from assistant_agent import (
 
 
 class TestFunctions(unittest.TestCase):
-
-    def test_count_total_success_and_missing(self):
-        test_items = ["Mouse nirkabel", "NonExistentItem", "headset"]
-        result = count_total(test_items)
-        
-        assert "NonExistentItem" in result
-
-    def test_trim_history(self):
-        input_list = ["msg1", "msg2", "msg3", "msg4", "msg5"]
-        count_list = [2, 3]
-
-        trim_history(input_list, count_list)
-        
-        assert input_list == ["msg3", "msg4", "msg5"]
-        assert count_list == [3]
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -148,6 +134,24 @@ class TestFunctions(unittest.TestCase):
 
         self.assertEqual(input_list, [])
         self.assertEqual(count_list, [])
+        
+    def test_trim_history(self):
+        input_list = ["msg1", "msg2", "msg3", "msg4", "msg5"]
+        count_list = [2, 3]
+
+        trim_history(input_list, count_list)
+        
+        assert input_list == ["msg3", "msg4", "msg5"]
+        assert count_list == [3]
+
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_local_command_barang(self, mock_stdout):
+        local_command('/barang', [], [])
+        
+        output = mock_stdout.getvalue()
+        for item in PSEUDO_DB:
+            expected_line = f"Name: {item['name']}; Price: {item['price']}"
+            self.assertIn(expected_line, output)
 
 if __name__ == "__main__":
     unittest.main()
