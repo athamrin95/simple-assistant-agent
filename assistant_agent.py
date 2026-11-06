@@ -27,59 +27,61 @@ However, if the number of function calls exceed the set maximum of times, you mu
 unable to complete their request due to operational limitations and that they should try asking again in a simpler query.
 
 # Available Tools
-- `list_items`: Returns a complete list of all database items, where each item contains a `lowercase name`,
-`name`, and `price`.
+- `find_item`: Returns a complete list of all database items if no argument is given, or the details of an item
+if an argument is given. This argument is the item's name.
 - `count_total`: Calculates the combined total price for a given list of item names.
 
-# Operational Rules for `list_items`
+# Operational Rules for `find_item`
 1. **Mandatory Tool Usage:** Whenever a user asks about database items, availability, comparisons,
-or individual prices (without calculation), you must call `list_items` to fetch the latest data.
-2. **Data Limitations:** Database items consist **only** of 'lowercase name', `name` and `price` as 
-described in the available tools section. Do not invent extra attributes (such as stock quantities,
-descriptions, or categories) unless explicitly returned by the tool.
+or individual prices (without calculation), you must call `find_item` to fetch the latest data. Do not rely
+on assumptions or prior knowledge.
+2. **Data Limitations:** Database items consist **only** of `name` and `price`. Do not invent extra attributes
+(such as stock quantities, descriptions, or categories) unless explicitly returned by the tool.
 3. **Communication Style:** Present prices clearly using clean bullet points or tables. If an item
 is missing from the database, clearly state that it is unavailable.
-4. **Tool response:** The tool response JSON structure will look like as follows:
-{"lowercase name": {"Name": Price}}
-Do not present the lowercase name to the user, simply use the associated name and price field.
-5. **Partial or Fuzzy Name Matching:** Assume that the user would always provide a partial, abbreviated,
-or incomplete item name (e.g., asking for the price of "key" when the database contains "Keyboard mekanik"),
-you must call `list_items` first to fetch the database contents, evaluate the items, and deduce or match the
-closest intended item name from the database to answer the user accurately. This doesn't mean that the user
-provided item name is always wrong, but always check the provided item name by the user against the actual
-item name stored in the databse.
+4. **Argument vs. No Argument:** This tool accepts no argument or an argument. If the user wishes to find all items
+or gave no specific name, then simply provide no argument for the tool. If the user wishes to find some specified
+item(s), then the item name from the user query must be passed down to the `item_name` string argument. Note that
+if multiple names are provided, you must break them down to one `find_item` tool per item. For example, if the user
+queries "I want to find the price of webcam and mouse", then you need to call for find_item("webcam") and
+find_item("mouse").
+5. **Partial or Fuzzy Name:** Assume that the user would always provide a partial, abbreviated,
+or incomplete item name (e.g., asking for the price of "key" when the database contains "Keyboard mekanik").
+As such, you must use the name provided from the response, assuming you get a positive response, as the official
+name for your answer to the user's query.
 
 # Operational Rules for `count_total`
 1. **Never Used First & Prerequisite:** `count_total` must **never** be used as the first tool call.
-Because user inputs may contain wrong, abbreviated, or partial item names, you must always call `list_items`
+Because user inputs may contain wrong, abbreviated, or partial item names, you must always call `find_item`
 first to retrieve the official item names from the database.
-2. **Execution Sequence:** `count_total` is strictly to be used only *after* you have already called `list_items`
+2. **Execution Sequence:** `count_total` is strictly to be used only *after* you have already called `find_item`
 to obtain the correct and proper database names, which you then pass into the `item_names` argument.
 3. **Item Names:** Pass the exact validated item names retrieved from the database into the `item_names` list argument.
 4. **Handling Missing Items:** If the tool response indicates that any requested item was missing or not found, you must
 explicitly mention this in your final response to inform the user that those items were excluded from the total calculation.
 5. **Zero Total Price:** If the total price is 0 because all of the item(s) requested by the user is/are missing, then do not
 include the price in your final response.
-6. **A Singular Item:** If the user only supplies one item but is still asking for a total price, you must still call `list_items`
+6. **A Singular Item:** If the user only supplies one item but is still asking for a total price, you must still call `find_item`
 first, and then use `count_total` with its correct database name instead of other tools.
-
-#Special Exception:
-For the purpose of this testing, if the user specifically asked for "Command A" in their initial query,
-do a function call of tool "list_items" first to get a list of items, and then do another function call
-of tool "count_total" for the item "Webcam" and return the final result to the user.
 """
 
 TOOLS = [
     {
         "type": "function",
-        "name": "list_items",
+        "name": "find_item",
         "description": (
-            "Returns a complete list of all items currently stored in the database."
-            "Each item contains the following fields: `lowercase name`, `name`, and `price`"
+            "Returns a complete list of all items currently stored in the database if no argument is given."
+            "Returns an item if an item name is given as the argument"
+            "Each item contains the following keys: `name`, and `price` and their respective values"
         ),
         "parameters": {
             "type": "object",
-            "properties": {},
+            "properties": {
+                "item_name": {
+                    "type": "string",
+                    "description": "The item name is given as the argument to find the details of only said item",
+                }
+            },
         },
     },
     {
@@ -104,35 +106,43 @@ TOOLS = [
     },
 ]
 
-PSEUDO_DB = {
-    "mouse nirkabel": {"Mouse nirkabel": 150000},
-    "keyboard mekanik": {"Keyboard mekanik": 275000},
-    "headset": {"Headset": 320000},
-    "hub usb": {"Hub USB": 189000},
-    "webcam": {"Webcam": 410000},
-}
+PSEUDO_DB = [
+    {"name": "Mouse nirkabel", "price": 150000},
+    {"name": "Keyboard mekanik", "price": 275000},
+    {"name": "Headset", "price": 320000},
+    {"name": "Hub USB", "price": 189000},
+    {"name": "Webcam", "price": 410000},
+]
 
 HISTORY_FILE_PATH = "riwayat.json"
 
 MAX_QUERIES_STORED = 2
 
-def list_items(db:dict) -> str:
-    return json.dumps(db)
+def find_item(item_name = None) -> str:
+    if item_name is None:
+        return PSEUDO_DB
+    
+    for entry in PSEUDO_DB:
+        if item_name.casefold() in entry["name"].casefold():
+            return entry
+
+    return "Item is unavailable"
 
 def count_total(items:list) -> str:
-    total = 0
-    missing = []
-    for item in items:
-        lowercase_item = item.casefold()
-        if PSEUDO_DB.get(lowercase_item) is not None:
-            total += next(iter(PSEUDO_DB[lowercase_item].values()))
-        else:
-            missing.append(item)
+    set_items = set(items)
+    total_price = 0.0
 
-    result = f"Total price is {total}."
-    if missing:
-        result += (f" But the following item(s) is/are missing: {", ".join(missing)}")
-    return result
+    for entry in PSEUDO_DB:
+        item_name = entry.get("name")
+        if item_name in set_items:
+            total_price += float(entry["price"])
+            set_items.remove(item_name)
+
+    final_answer = f"Total Price: {total_price}"
+    if set_items:
+        final_answer += f". But the following items are not found: {set_items}"
+
+    return set_items
 
 def check_env(api_key:str, base_url:str, model:str) -> str:
     """Returns None if .env is loaded properly and the necessary properties are present."""
@@ -146,71 +156,80 @@ def call_ai_with_tools(client:OpenAI, input_list:list, user_input:str, count_lis
         temp_list = list(input_list)
         count = len(temp_list)
         temp_list.append({"role": "user", "content": user_input})
-        first_response = client.responses.create(
-            model=openrouter_model,
-            instructions=INSTRUCTIONS,
-            input=temp_list,
-            tools=TOOLS,
-        )
-        temp_list += first_response.output
-        tools_called = False
-        for item in first_response.output:
-            if item.type == "function_call":
-                tools_called = True
-                print(f"Tool {item.name} has been requested by the agent")
-                if item.name == "list_items":
-                    tool_output = list_items(PSEUDO_DB)
 
-                elif item.name == "count_total":
-                    items = json.loads(item.arguments)["item_names"]
-                    tool_output = count_total(items)
-                
-                else:
-                    tool_output = json.dumps({
-                        "error": f"Tool '{item.name}' does not exist."
-                    })
-                temp_list.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": item.call_id,
-                        "output": tool_output,
-                    }
-                )
-        if tools_called:
-            second_response_stream = client.responses.create(
+        max_chains = 4 # Don't forget to synchronize this number with the one set in INSTRUCTIONS too
+        chain_number = 0
+        while chain_number < max_chains:
+            chain_number += 1
+            response_stream = client.responses.create(
                 model=openrouter_model,
                 instructions=INSTRUCTIONS,
                 input=temp_list,
                 tools=TOOLS,
                 stream = True,
             )
+            response_output = None
             response_collected = False
-            for event in second_response_stream:
-                if event.type == "response.output_item.added" and event.item.type == "function_call":
-                    return "An error has occurred. It seems that your request is too complex to be completed all at once. Please try a simpler query."
-
-                elif event.type == "response.output_text.delta":
+            for event in response_stream:
+                if event.type == "response.output_text.delta":
+                    # Agent is giving the final answer to user's query
                     print(event.delta, end="", flush=True)
 
                 elif event.type == "response.completed":
                     temp_list += event.response.output
+                    response_output = event.response.output
                     response_collected = True
-
-            print()
+                    
+            # Do final check if response has been properly completed
             if not response_collected:
                 return "An error has occurred. It seems that the response from the agent has never reached completion status. Please retry your query again."
-            else:
-                return_this = ""
+            
+            tools_called = False
+            for item in response_output:
+                if item.type == "function_call":
+                    # Preparing for the next chain function call
+                    tools_called = True
+                    if item.name == "find_item":
+                        try:
+                            arg = json.loads(item.arguments)["item_name"]
+                            if arg == "":
+                                print(f"Tool {item.name}() has been requested by the agent")
+                                tool_output = json.dumps(find_item())
+                            else:
+                                print(f"Tool {item.name}({arg}) has been requested by the agent")
+                                tool_output = json.dumps(find_item(arg))
+                        except json.JSONDecodeError:
+                            tool_output = json.dumps({"error": "The given argument is not JSON"})
 
-        else:
-            return_this = first_response.output_text
+                    elif item.name == "count_total":
+                        try:
+                            items = json.loads(item.arguments)["item_names"]
+                            print(f"Tool {item.name}({items}) has been requested by the agent")
+                            tool_output = count_total(items)
+                        except json.JSONDecodeError:
+                            tool_output = json.dumps({"error": "The given argument is not JSON"})
+                    
+                    else:
+                        print(f"Tool {item.name} has been requested by the agent, but this tool doesn't exist!")
+                        tool_output = json.dumps({"error": f"Tool '{item.name}' does not exist."})
 
-        count = len(temp_list) - count
-        input_list.clear()
-        input_list.extend(temp_list)
-        count_list.append(count)
-        
-        return return_this
+                    temp_list.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": item.call_id,
+                            "output": tool_output,
+                        }
+                    )   
+            if not tools_called:
+                # This should be the final answer from the agent to the user's query
+                count = len(temp_list) - count
+                input_list.clear()
+                input_list.extend(temp_list)
+                count_list.append(count)
+                return ""
+            
+        # Over the limit of max_chains
+        return "An error has occurred. It seems that your request is too complex to be completed all at once. Please try a simpler query."
 
     except Exception as e:
         return f"An error has occurred: {e}"
@@ -237,7 +256,7 @@ def local_command(user_input:str, input_list:list, count_list:list):
             print(f">>> {entry}")
 
     elif user_input == 'barang':
-        db = json.loads(list_items(PSEUDO_DB))
+        db = json.loads(find_item())
         for v in db.values():
             for key, value in v.items():
                 print(f"{key}: {value}")
@@ -301,9 +320,8 @@ def main() -> None:
             continue
         
         result = call_ai_with_tools(client, input_list, user_input, count_list, openrouter_model)
-        if result:
-            print(result)
-        
+        print(result)
+            
         while len(count_list) > MAX_QUERIES_STORED:
             trim_history(input_list, count_list)
 

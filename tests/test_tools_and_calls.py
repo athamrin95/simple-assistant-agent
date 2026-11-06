@@ -32,18 +32,23 @@ class TestToolsAndCalls(unittest.TestCase):
         first_response_mock = MagicMock()
         first_response_mock.output = [mock_tool_call]
 
+        event_completed_1 = MagicMock()
+        event_completed_1.type = "response.completed"
+        event_completed_1.response = first_response_mock
+
         event_delta = MagicMock()
         event_delta.type = "response.output_text.delta"
         event_delta.delta = "Total price for Mouse nirkabel is 150.000."
 
-        event_completed = MagicMock()
-        event_completed.type = "response.completed"
-        event_completed.response = MagicMock(output=[])
+        event_completed_2 = MagicMock()
+        event_completed_2.type = "response.completed"
+        event_completed_2.response = MagicMock(output=[])
 
-        second_response_stream = [event_delta, event_completed]
+        first_response_stream = [event_completed_1]
+        second_response_stream = [event_delta, event_completed_2]
 
         mock_client.responses.create.side_effect = [
-            first_response_mock,
+            first_response_stream,
             second_response_stream,
         ]
 
@@ -70,12 +75,11 @@ class TestToolsAndCalls(unittest.TestCase):
 
     def test_call_ai_direct_response_mocked(self):
         mock_client = MagicMock()
-        direct_response_mock = MagicMock()
-        direct_response_mock.output = []
-        direct_response_mock.output_text = (
-            "I can only assist with database items."
-        )
-        mock_client.responses.create.return_value = direct_response_mock
+        event_completed = MagicMock()
+        event_completed.type = "response.completed"
+        event_completed.response = MagicMock(output=[])
+
+        mock_client.responses.create.return_value = [event_completed]
 
         input_list = []
         count_list = []
@@ -85,16 +89,25 @@ class TestToolsAndCalls(unittest.TestCase):
             mock_client, input_list, user_input, count_list, "test-model"
         )
 
-        assert "I can only assist" in result
+        assert result == ""
         assert mock_client.responses.create.call_count == 1
         assert len(count_list) == 1
 
     def test_call_ai_chained_tool_error_mocked(self):
         mock_client = MagicMock()
+        
         tool_call_1 = MagicMock()
         tool_call_1.type = "function_call"
         tool_call_1.name = "list_items"
         tool_call_1.call_id = "call_1"
+        tool_call_1.arguments = json.dumps({})
+
+        response_mock_1 = MagicMock()
+        response_mock_1.output = [tool_call_1]
+
+        event_completed_1 = MagicMock()
+        event_completed_1.type = "response.completed"
+        event_completed_1.response = response_mock_1
 
         tool_call_2 = MagicMock()
         tool_call_2.type = "function_call"
@@ -102,16 +115,20 @@ class TestToolsAndCalls(unittest.TestCase):
         tool_call_2.call_id = "call_2"
         tool_call_2.arguments = json.dumps({"item_names": ["Mouse nirkabel"]})
 
-        first_response = MagicMock()
-        first_response.output = [tool_call_1]
+        response_mock_2 = MagicMock()
+        response_mock_2.output = [tool_call_2]
 
-        event_error = MagicMock()
-        event_error.type = "response.output_item.added"
-        event_error.item = tool_call_2
+        event_completed_2 = MagicMock()
+        event_completed_2.type = "response.completed"
+        event_completed_2.response = response_mock_2
 
-        second_response_stream = [event_error]
-
-        mock_client.responses.create.side_effect = [first_response, second_response_stream]
+        mock_client.responses.create.side_effect = [
+            [event_completed_1],
+            [event_completed_2],
+            [event_completed_2],
+            [event_completed_2],
+            [event_completed_2]
+        ]
 
         input_list = []
         count_list = []
@@ -140,12 +157,19 @@ class TestToolsAndCalls(unittest.TestCase):
 
     def test_input_list_unmodified_on_chained_tool_error(self):
         mock_client = MagicMock()
+        
         tool_call_1 = MagicMock()
         tool_call_1.type = "function_call"
         tool_call_1.name = "list_items"
         tool_call_1.call_id = "call_1"
-        first_response = MagicMock()
-        first_response.output = [tool_call_1]
+        tool_call_1.arguments = json.dumps({})
+
+        response_mock_1 = MagicMock()
+        response_mock_1.output = [tool_call_1]
+
+        event_completed_1 = MagicMock()
+        event_completed_1.type = "response.completed"
+        event_completed_1.response = response_mock_1
 
         tool_call_2 = MagicMock()
         tool_call_2.type = "function_call"
@@ -153,13 +177,20 @@ class TestToolsAndCalls(unittest.TestCase):
         tool_call_2.call_id = "call_2"
         tool_call_2.arguments = json.dumps({"item_names": ["Mouse nirkabel"]})
 
-        event_error = MagicMock()
-        event_error.type = "response.output_item.added"
-        event_error.item = tool_call_2
+        response_mock_2 = MagicMock()
+        response_mock_2.output = [tool_call_2]
 
-        second_response_stream = [event_error]
+        event_completed_2 = MagicMock()
+        event_completed_2.type = "response.completed"
+        event_completed_2.response = response_mock_2
 
-        mock_client.responses.create.side_effect = [first_response, second_response_stream]
+        mock_client.responses.create.side_effect = [
+            [event_completed_1],
+            [event_completed_2],
+            [event_completed_2],
+            [event_completed_2],
+            [event_completed_2]
+        ]
 
         initial_input_list = [{"role": "user", "content": "Initial history"}]
         input_list_copy = list(initial_input_list)

@@ -7,11 +7,18 @@ Rename the file ".env.example" to ".env" and fill in OPENROUTER_API_KEY with you
 You may change the AI model with a different one that's available in OpenRouter by changing the value of OPENROUTER_MODEL
 
 Changelog:
+- Version 6:<br>
+Changed how the existing tools work (find_item and count_total) to fit with the new database structure and requirements.<br>
+Agent is now allowed to repeatedly chain function/tool calls up to a maximum of 4 times per user query.<br>
+All responses received from the agent via the OpenRouter API now uses stream, so every answer to user query is now displayed
+as soon as it's collected/received from said agent.<br>
+
 - Version 5.5:<br>
 Added the script "assistant_agent_token.py" to mostly show the token usage and cost related to the query made by
 the user.<br>
-Added a local command "/biaya" to show how much tokens and money (cost) have been spent by the user since
+Added a local command "/biaya" (for this version only) to show how much tokens and money (cost) have been spent by the user since
 the beginning of starting the script.<br>
+
 
 - Version 5:<br>
 Changed the second response for the function call section to use stream so the final answer can be shown to the user as soon as possible without
