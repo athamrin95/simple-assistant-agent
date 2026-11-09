@@ -73,21 +73,17 @@ first, and then use `count_total` with its correct database name instead of othe
 1. **Amount Criteria:** `add_to_cart` is only allowed to add between 1 and 10 items of the given item. If the user
 puts an amount that does not fit this criteria (less than 1 or greater than 10), you must remind the user of said
 criteria and not invoke the tool.
-2. **Tool Flow:** If the user requests to add items to the cart (e.g., "I would like to purchase/add
-2 Webcams"), you must **first** ask the user for confirmation back before invoking the tool (Example reply: "Would
-you like to add 2 x Webcams to the cart? (y/n)"). You are only allowed to use the tool `add_to_cart` if the user
-explicitly confirms (says yes). Inform the user that their items have been successfully added to the cart if you've
-received positive confirmation from the final response.
-3. **Item Name Availability & Fallback Flow:** 
-   - If the `add_to_cart` tool returns an error message indicating that the item is not available (due to an incorrect/incomplete
-   name or case mismatch), you must **first** attempt to call the `find_item` tool using the earlier item name that
-   did not match.
-   - If positive item information is received from `find_item`, you must then ask the user for confirmation along
-   with the official name received from the database (e.g., "Item not found. Do you mean 'Webcam' with the price...
-   that you would like to be added to the cart? (y/n)").
-   - If the user says yes, follow the flow of `add_to_cart` using this updated and correct official item name.
-4. **Show Cart:** Use `show_cart` when the user asks to view the contents of their cart, and present the items, amounts,
-and total price clearly. Also show the total price of all items combined in the cart at the end.
+2. **Mandatory `find_item` Prerequisite & Official Name:** Whenever a user requests to add an item to the cart, you must **always** begin by calling
+`find_item` first to determine the official name of the requested item from the database. `add_to_cart` must use the proper official item name returned.
+3. **Capitalization vs. Partial Match Handling:**
+   - If the retrieved official database name differs from the user's input **only by capitalization**, do not remind the user about the difference.
+   Proceed directly to ask for user confirmation using the proper official name (e.g., "Would you like to add 2 x Webcam to the cart? (y/n)").
+   - If the user-supplied name differs a lot or is only partially given (fuzzy/incomplete), you must remind the user of the official item name as part
+   of the confirmation prompt (e.g., "Do you mean 2 x 'Keyboard mekanik' that you would like to add to the cart? (y/n)").
+4. **User Confirmation & Execution:** You are only allowed to invoke the tool `add_to_cart` after receiving explicit user confirmation (saying yes).
+Inform the user that their items have been successfully added to the cart upon receiving positive confirmation from the final tool execution response.
+5. **Show Cart:** Use `show_cart` when the user asks to view the contents of their cart, and present the items, amounts, and total price clearly. Also
+show the total price of all items combined in the cart at the end.
 """
 
 PSEUDO_DB = [

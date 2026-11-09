@@ -106,9 +106,9 @@ def add_to_cart(db:list, cart:dict, name:str, amount:int):
         return {"error": "The given amount has exceeded the set limit or is set below it."}
 
     ori_amount = amount
-    # Name check is stricter than in find_item, name must match (case-insensitive)
+    # Strict name check enforced
     for entry in db:
-        if name.casefold() == entry["name"].casefold():
+        if name == entry["name"]:
             # Check if item already exist in cart
             if entry["name"] in cart:
                 amount = cart[entry["name"]]["amount"] + amount
