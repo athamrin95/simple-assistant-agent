@@ -7,6 +7,13 @@ Rename the file ".env.example" to ".env" and fill in OPENROUTER_API_KEY with you
 You may change the AI model with a different one that's available in OpenRouter by changing the value of OPENROUTER_MODEL
 
 Changelog:
+- Version 8:<br>
+Added a pseudo shopping cart capability to the script as users can now request for items present in the database
+to be added to the cart.<br>
+Added a local command '/keranjang' to show what item has already been added to the cart as a result of the user
+query to the agent.<br>
+Added two tools that the agent can use, 'add_to_cart' and 'show_cart', to support this new feature.<br>
+
 - Version 7:<br>
 Separated the tools available for the agent to use into its own file "tools.py".<br>
 Streamlined the code logic in determining what tools the agent is requesting.<br>

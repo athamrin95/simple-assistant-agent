@@ -43,7 +43,7 @@ class TestFunctions(unittest.TestCase):
 
         with patch("assistant_agent.HISTORY_FILE_PATH", self.test_file_path):
             with self.assertRaises(SystemExit) as cm:
-                local_command("/keluar", input_list, [])
+                local_command("/keluar", input_list, [], {})
             
             self.assertEqual(cm.exception.code, 1)
 
@@ -146,12 +146,29 @@ class TestFunctions(unittest.TestCase):
 
     @patch('sys.stdout', new_callable=io.StringIO)
     def test_local_command_barang(self, mock_stdout):
-        local_command('/barang', [], [])
+        local_command('/barang', [], [], {})
         
         output = mock_stdout.getvalue()
         for item in PSEUDO_DB:
             expected_line = f"Name: {item['name']}; Price: {item['price']}"
             self.assertIn(expected_line, output)
+
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_local_command_keranjang_empty(self, mock_stdout):
+        cart = {}
+        local_command('/keranjang', [], [], cart)
+        output = mock_stdout.getvalue().strip()
+        self.assertEqual(output, "The cart is empty.")
+
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_local_command_keranjang_populated(self, mock_stdout):
+        cart = {
+            "Headset": {"amount": 2, "total": 640000}
+        }
+        local_command('/keranjang', [], [], cart)
+        output = mock_stdout.getvalue().strip()
+        self.assertIn("Headset x2: Rp640000", output)
+        self.assertIn("Total: 640000", output)
 
 if __name__ == "__main__":
     unittest.main()

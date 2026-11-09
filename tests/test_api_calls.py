@@ -46,7 +46,7 @@ class TestAPICalls(unittest.TestCase):
         captured_output = io.StringIO()
         with patch("sys.stdout", new=captured_output):
             result = call_ai_with_tools(
-                mock_client, input_list, user_input, count_list, "test-model"
+                mock_client, "test-model", input_list, user_input, count_list, {} 
             )
 
         assert "150.000" in captured_output.getvalue()
@@ -59,6 +59,93 @@ class TestAPICalls(unittest.TestCase):
         assert (
             has_tool_output
         ), "The input_list should record the function_call_output response."
+
+    def test_call_ai_add_to_cart_mocked(self):
+        mock_client = MagicMock()
+        mock_tool_call = MagicMock()
+        mock_tool_call.type = "function_call"
+        mock_tool_call.name = "add_to_cart"
+        mock_tool_call.call_id = "call_cart_1"
+        mock_tool_call.arguments = json.dumps({"name": "Headset", "amount": 2})
+
+        first_response_mock = MagicMock()
+        first_response_mock.output = [mock_tool_call]
+
+        event_completed_1 = MagicMock()
+        event_completed_1.type = "response.completed"
+        event_completed_1.response = first_response_mock
+
+        event_delta = MagicMock()
+        event_delta.type = "response.output_text.delta"
+        event_delta.delta = "Successfully added 2 Headset to the cart!"
+
+        event_completed_2 = MagicMock()
+        event_completed_2.type = "response.completed"
+        event_completed_2.response = MagicMock(output=[])
+
+        mock_client.responses.create.side_effect = [
+            [event_completed_1],
+            [event_delta, event_completed_2],
+        ]
+
+        input_list = []
+        count_list = []
+        cart = {}
+        user_input = "Add 2 Headset to the cart"
+
+        captured_output = io.StringIO()
+        with patch("sys.stdout", new=captured_output):
+            call_ai_with_tools(
+                mock_client, "test-model", input_list, user_input, count_list, cart
+            )
+
+        assert "Successfully added 2 Headset" in captured_output.getvalue()
+        assert mock_client.responses.create.call_count == 2
+        assert "Headset" in cart
+        assert cart["Headset"]["amount"] == 2
+
+    def test_call_ai_show_cart_mocked(self):
+        mock_client = MagicMock()
+        mock_tool_call = MagicMock()
+        mock_tool_call.type = "function_call"
+        mock_tool_call.name = "show_cart"
+        mock_tool_call.call_id = "call_cart_2"
+        mock_tool_call.arguments = json.dumps({})
+
+        first_response_mock = MagicMock()
+        first_response_mock.output = [mock_tool_call]
+
+        event_completed_1 = MagicMock()
+        event_completed_1.type = "response.completed"
+        event_completed_1.response = first_response_mock
+
+        event_delta = MagicMock()
+        event_delta.type = "response.output_text.delta"
+        event_delta.delta = "Headset x2: Rp640000\nTotal: 640000"
+
+        event_completed_2 = MagicMock()
+        event_completed_2.type = "response.completed"
+        event_completed_2.response = MagicMock(output=[])
+
+        mock_client.responses.create.side_effect = [
+            [event_completed_1],
+            [event_delta, event_completed_2],
+        ]
+
+        input_list = []
+        count_list = []
+        cart = {"Headset": {"amount": 2, "total": 640000}}
+        user_input = "Show my cart"
+
+        captured_output = io.StringIO()
+        with patch("sys.stdout", new=captured_output):
+            call_ai_with_tools(
+                mock_client, "test-model", input_list, user_input, count_list, cart
+            )
+
+        assert "Headset x2" in captured_output.getvalue()
+        assert "Total: 640000" in captured_output.getvalue()
+        assert mock_client.responses.create.call_count == 2
 
     def test_call_ai_direct_response_mocked(self):
         mock_client = MagicMock()
@@ -73,7 +160,7 @@ class TestAPICalls(unittest.TestCase):
         user_input = "How's the weather today?"
 
         result = call_ai_with_tools(
-            mock_client, input_list, user_input, count_list, "test-model"
+            mock_client, "test-model", input_list, user_input, count_list, {}
         )
 
         assert result == ""
@@ -85,9 +172,9 @@ class TestAPICalls(unittest.TestCase):
         
         tool_call_1 = MagicMock()
         tool_call_1.type = "function_call"
-        tool_call_1.name = "find_item"  # Updated to find_item
+        tool_call_1.name = "find_item"
         tool_call_1.call_id = "call_1"
-        tool_call_1.arguments = json.dumps({"name": ""})  # Updated to match TOOLS argument structure
+        tool_call_1.arguments = json.dumps({"name": ""})
 
         response_mock_1 = MagicMock()
         response_mock_1.output = [tool_call_1]
@@ -122,7 +209,7 @@ class TestAPICalls(unittest.TestCase):
         user_input = "Give me a list of all items and count all of their total price"
 
         result = call_ai_with_tools(
-            mock_client, input_list, user_input, count_list, "test-model"
+            mock_client, "test-model", input_list, user_input, count_list, {}
         )
 
         assert "too complex" in result.lower()
@@ -136,7 +223,7 @@ class TestAPICalls(unittest.TestCase):
         count_list = []
 
         result = call_ai_with_tools(
-            mock_client, initial_input_list, "Test prompt", count_list, "test-model"
+            mock_client, "test-model", initial_input_list, "Test prompt", count_list, {}
         )
 
         assert "An error has occurred" in result
@@ -147,9 +234,9 @@ class TestAPICalls(unittest.TestCase):
         
         tool_call_1 = MagicMock()
         tool_call_1.type = "function_call"
-        tool_call_1.name = "find_item"  # Updated to find_item
+        tool_call_1.name = "find_item"
         tool_call_1.call_id = "call_1"
-        tool_call_1.arguments = json.dumps({"name": ""})  # Updated to match TOOLS argument structure
+        tool_call_1.arguments = json.dumps({"name": ""})
 
         response_mock_1 = MagicMock()
         response_mock_1.output = [tool_call_1]
@@ -184,7 +271,7 @@ class TestAPICalls(unittest.TestCase):
         count_list = []
 
         result = call_ai_with_tools(
-            mock_client, initial_input_list, "Give me everything and calculate", count_list, "test-model"
+            mock_client, "test-model", initial_input_list, "Give me everything and calculate", count_list, {}
         )
 
         assert "too complex" in result.lower()

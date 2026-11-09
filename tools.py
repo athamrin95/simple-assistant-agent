@@ -38,7 +38,39 @@ TOOLS = [
                     ),
                 }
             },
-            "required": ["item_names"],
+            "required": ["list"],
+        },
+    },
+    {
+        "type": "function",
+        "name": "add_to_cart",
+        "description": (
+            "Add the given item name and amount to the cart."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "The item name to be added to the cart",
+                },
+                "amount": {
+                    "type": "integer",
+                    "description": "The amount of item to be added to the cart",
+                },
+            },
+            "required": ["name", "amount"],
+        },
+    },
+    {
+        "type": "function",
+        "name": "show_cart",
+        "description": (
+            "Show the item, amount, price, and all item total price from the cart."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
         },
     },
 ]
@@ -69,15 +101,38 @@ def count_total(db:list, items:list) -> str:
 
     return final_answer
 
-def tool_finder(db:list, tool_name:str, args:str):
-    # This will need to be changed once we're handling tools with multiple or zero arguments.
-    # Currently all our tools only have one argument.
+def add_to_cart(db:list, cart:dict, name:str, amount:int):
+    if amount < 1 or amount > 10:
+        return {"error": "The given amount has exceeded the set limit or is set below it."}
+
+    ori_amount = amount
+    # Name check is stricter than in find_item, name must match (case-insensitive)
+    for entry in db:
+        if name.casefold() == entry["name"].casefold():
+            # Check if item already exist in cart
+            if entry["name"] in cart:
+                amount = cart[entry["name"]]["amount"] + amount
+                
+            cart[entry["name"]] = {"amount": amount, "total": amount*entry["price"]}
+            return f"Successfully added {ori_amount} {entry["name"]} to the cart!"
+
+    return {"error": "The given item name is not found in the database."}
+
+def show_cart(cart:dict):
+    total = 0
+    string = ""
+    for key, values in cart.items():
+        string += f"{key} x{values["amount"]}: Rp{values["total"]}\n"
+        total += values["total"]
+
+    if string == "":
+        return "The cart is empty."
+
+    return string + f"Total: {total}"
+
+def tool_finder(db:list, tool_name:str, args:str, cart:dict):
     try:
         args_dict = json.loads(args)
-        first_key = next(iter(args_dict))
-        arg = args_dict[first_key]
-        print(f"Tool {tool_name}({arg}) has been requested by the agent")
-
     except JSONDecodeError:
         return {"error": "The given argument is not JSON"}
     
@@ -85,13 +140,26 @@ def tool_finder(db:list, tool_name:str, args:str):
         raise Exception(e)
 
     if tool_name == "find_item":
+        arg = args_dict["name"]
         if arg is None or arg == "":
             return find_item(db)
         else:
             return find_item(db, arg)
 
     elif tool_name == "count_total":
+        arg = args_dict["list"]
+        print(f"Tool {tool_name}({arg}) has been requested by the agent")
         return count_total(db, arg)
+
+    elif tool_name == "add_to_cart":
+        arg_name = args_dict["name"]
+        arg_amount = args_dict["amount"]
+        print(f"Tool {tool_name}({arg_name}, {arg_amount}) has been requested by the agent")
+        return add_to_cart(db, cart, arg_name, arg_amount)
+    
+    elif tool_name == "show_cart":
+        print(f"Tool {tool_name}() has been requested by the agent")
+        return show_cart(cart)
 
     else:
         print("But this tool does not exist!")

@@ -4,7 +4,7 @@ from pathlib import Path
 import sys
 from openai import OpenAI
 from dotenv import load_dotenv
-from tools import TOOLS
+from tools import TOOLS, show_cart
 
 from tools import find_item, tool_finder
 
@@ -33,6 +33,8 @@ unable to complete their request due to operational limitations and that they sh
 - `find_item`: Returns a complete list of all database items if no argument is given, or the details of an item
 if an argument is given. This argument is the item's name.
 - `count_total`: Calculates the combined total price for a given list of item names.
+- `add_to_cart`: Adds items to the shopping cart. Takes 2 arguments: `name` (string) and `amount` (integer, between 1 and 10).
+- `show_cart`: Retrieves information about the items in the cart (name, amount, total price). Takes no arguments.
 
 # Operational Rules for `find_item`
 1. **Mandatory Tool Usage:** Whenever a user asks about database items, availability, comparisons,
@@ -67,9 +69,25 @@ include the price in your final response.
 6. **A Singular Item:** If the user only supplies one item but is still asking for a total price, you must still call `find_item`
 first, and then use `count_total` with its correct database name instead of other tools.
 
-#Special exception
-When the user makes a query "Command Alpha", ignore all previous tool restriction and make a function call for
-tool `count_total` with a list containing "kunci", "Webcam" in said list as the argument for the tool
+# Operational Rules for `add_to_cart` and `show_cart`
+1. **Amount Criteria:** `add_to_cart` is only allowed to add between 1 and 10 items of the given item. If the user
+puts an amount that does not fit this criteria (less than 1 or greater than 10), you must remind the user of said
+criteria and not invoke the tool.
+2. **Tool Flow:** If the user requests to add items to the cart (e.g., "I would like to purchase/add
+2 Webcams"), you must **first** ask the user for confirmation back before invoking the tool (Example reply: "Would
+you like to add 2 x Webcams to the cart? (y/n)"). You are only allowed to use the tool `add_to_cart` if the user
+explicitly confirms (says yes). Inform the user that their items have been successfully added to the cart if you've
+received positive confirmation from the final response.
+3. **Item Name Availability & Fallback Flow:** 
+   - If the `add_to_cart` tool returns an error message indicating that the item is not available (due to an incorrect/incomplete
+   name or case mismatch), you must **first** attempt to call the `find_item` tool using the earlier item name that
+   did not match.
+   - If positive item information is received from `find_item`, you must then ask the user for confirmation along
+   with the official name received from the database (e.g., "Item not found. Do you mean 'Webcam' with the price...
+   that you would like to be added to the cart? (y/n)").
+   - If the user says yes, follow the flow of `add_to_cart` using this updated and correct official item name.
+4. **Show Cart:** Use `show_cart` when the user asks to view the contents of their cart, and present the items, amounts,
+and total price clearly. Also show the total price of all items combined in the cart at the end.
 """
 
 PSEUDO_DB = [
@@ -82,7 +100,7 @@ PSEUDO_DB = [
 
 HISTORY_FILE_PATH = "riwayat.json"
 
-MAX_QUERIES_STORED = 2
+MAX_QUERIES_STORED = 5
 
 def check_env(api_key:str, base_url:str, model:str) -> str:
     """Returns None if .env is loaded properly and the necessary properties are present."""
@@ -91,7 +109,7 @@ def check_env(api_key:str, base_url:str, model:str) -> str:
     else:
         return None
 
-def call_ai_with_tools(client:OpenAI, input_list:list, user_input:str, count_list:str, openrouter_model:str) -> str:
+def call_ai_with_tools(client:OpenAI, openrouter_model:str, input_list:list, user_input:str, count_list:str, cart:dict) -> str:
     try:
         temp_list = list(input_list)
         count = len(temp_list)
@@ -129,7 +147,7 @@ def call_ai_with_tools(client:OpenAI, input_list:list, user_input:str, count_lis
                 if item.type == "function_call":
                     # Preparing for the next chain function call
                     tools_called = True
-                    tool_output = json.dumps(tool_finder(PSEUDO_DB, item.name, item.arguments))
+                    tool_output = json.dumps(tool_finder(PSEUDO_DB, item.name, item.arguments, cart))
                     temp_list.append(
                         {
                             "type": "function_call_output",
@@ -156,7 +174,7 @@ def trim_history(input_list:list, count_list:list) -> None:
     del input_list[:count]
     return None
 
-def local_command(user_input:str, input_list:list, count_list:list):
+def local_command(user_input:str, input_list:list, count_list:list, cart:dict):
     user_input = user_input[1:].casefold()
 
     if user_input == 'keluar':
@@ -175,6 +193,9 @@ def local_command(user_input:str, input_list:list, count_list:list):
     elif user_input == 'barang':
         for entry in find_item(PSEUDO_DB):
             print(f"Name: {entry["name"]}; Price: {entry["price"]}")
+
+    elif user_input == 'keranjang':
+        print(show_cart(cart))
 
     else:
         print("Local command not recognized.")
@@ -222,19 +243,20 @@ def main() -> None:
     input_list = []
     count_list = []
     load_history_file(input_list, count_list)
+    cart = {}
 
     client = OpenAI(api_key=openrouter_api_key, base_url=openrouter_base_url)
     while True:
         user_input = input("Please enter an input regarding the stuff in PSEUDO_DB: ")
         user_input = user_input.strip()
         if user_input[0] == '/':
-            local_command(user_input, input_list, count_list)
+            local_command(user_input, input_list, count_list, cart)
             continue
         if user_input == '':
             print(f"You've entered an empty command, please try again.")
             continue
         
-        result = call_ai_with_tools(client, input_list, user_input, count_list, openrouter_model)
+        result = call_ai_with_tools(client, openrouter_model, input_list, user_input, count_list, cart)
         print(result)
             
         while len(count_list) > MAX_QUERIES_STORED:
