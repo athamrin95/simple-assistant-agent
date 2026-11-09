@@ -135,12 +135,12 @@ def tool_finder(db:list, tool_name:str, args:str, cart:dict):
         args_dict = json.loads(args)
     except JSONDecodeError:
         return {"error": "The given argument is not JSON"}
-    
     except Exception as e:
         raise Exception(e)
 
     if tool_name == "find_item":
         arg = args_dict["name"]
+        print(f"Tool {tool_name}({arg}) has been requested by the agent")
         if arg is None or arg == "":
             return find_item(db)
         else:
@@ -162,5 +162,5 @@ def tool_finder(db:list, tool_name:str, args:str, cart:dict):
         return show_cart(cart)
 
     else:
-        print("But this tool does not exist!")
+        print(f"Tool {tool_name} has been requested by the agent, but this tool does not exist!")
         return {"error": f"Tool `{tool_name}` does not exist."}

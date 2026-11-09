@@ -100,7 +100,7 @@ PSEUDO_DB = [
 
 HISTORY_FILE_PATH = "riwayat.json"
 
-MAX_QUERIES_STORED = 5
+MAX_QUERIES_STORED = 4
 
 def check_env(api_key:str, base_url:str, model:str) -> str:
     """Returns None if .env is loaded properly and the necessary properties are present."""
