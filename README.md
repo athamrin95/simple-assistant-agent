@@ -1,10 +1,23 @@
 A simple assistant agent using OpenRouter API. The assistant agent is allowed to use the provided function/tool to call during its task execution.<br>
 
+Current feature for assistant_agent.py:<br>
+- Showcasing the ability for the A.I. agent to use the following tools to assist in executing user's queries:<br>
+find_item: Returns a list of all or a specific item stored in the "database"<br>
+count_total: Counts the total price of a given list of items by the user<br>
+add_to_cart: Add the specified item(s) to a "shopping cart"<br>
+show_cart: Returns whatever item is currently stored in the cart<br>
+- Local command that the user can type in the message session with the agent (this will not send said message to the agent):<br>
+/keluar: Exits the script and save messages currently stored in the session to a file called "riwayat.json".
+The limit of messages saved is determined in the variable MAX_QUERIES_STORED in the script<br>
+/keranjang: Views all item(s) that is/are stored in the cart that the user have asked the agent to add during the session<br>
+/barang: Views all available items that are available in the "database"<br>
+/history: Returns all currently relevant saved messages sent to and received from the agent. Used for debugging purposes<br> 
+
 Note:<br>
 This project has been tested with Python 3.15<br>
 Dependencies required can be found in the file "requirements.txt"<br>
 Rename the file ".env.example" to ".env" and fill in OPENROUTER_API_KEY with your actual api key<br>
-You may change the AI model with a different one that's available in OpenRouter by changing the value of OPENROUTER_MODEL
+You may change the AI model with a different one that's available in OpenRouter by changing the value of OPENROUTER_MODEL<br>
 
 Changelog:
 - Version 8:<br>
@@ -13,6 +26,7 @@ to be added to the cart.<br>
 Added a local command '/keranjang' to show what item has already been added to the cart as a result of the user
 query to the agent.<br>
 Added two tools that the agent can use, 'add_to_cart' and 'show_cart', to support this new feature.<br>
+Added another local command "/keranjang" to view add items added to the cart during the session.<br>
 
 - Version 7:<br>
 Separated the tools available for the agent to use into its own file "tools.py".<br>
@@ -30,7 +44,6 @@ Added the script "assistant_agent_token.py" to mostly show the token usage and c
 the user.<br>
 Added a local command "/biaya" (for this version only) to show how much tokens and money (cost) have been spent by the user since
 the beginning of starting the script.<br>
-
 
 - Version 5:<br>
 Changed the second response for the function call section to use stream so the final answer can be shown to the user as soon as possible without
@@ -61,4 +74,3 @@ For this version, the call is configured in a way that the agent is allowed to c
 This script involves the agent using the provided tool 'list_items' to search for the items stored in the database. This is done to answer any of the user's query related to the database and items that are stored there.<br>
 Though for the sake of simplicity, this project will simply use a dict variable to store all of the items' information (For real life scenarios, you will most likely use an actual database).<br>
 This current version of the script remembers your previously sent messages (as is required due to how the api call is structured due to the usage of 'tools').
-
