@@ -245,12 +245,13 @@ def main() -> None:
     while True:
         user_input = input("Please enter an input regarding the stuff in PSEUDO_DB: ")
         user_input = user_input.strip()
-        if user_input[0] == '/':
-            local_command(user_input, input_list, count_list, cart)
-            continue
         if user_input == '':
             print(f"You've entered an empty command, please try again.")
             continue
+        if user_input[0] == '/':
+            local_command(user_input, input_list, count_list, cart)
+            continue
+        
         
         result = call_ai_with_tools(client, openrouter_model, input_list, user_input, count_list, cart)
         print(result)
