@@ -14,6 +14,7 @@ The limit of messages saved is determined in the variable MAX_QUERIES_STORED in 
 /history: Returns all currently relevant saved messages sent to and received from the agent. Used for debugging purposes<br> 
 
 Note:<br>
+The script `assistant_agent_token.py` is an older version of `assistant_agent.py` (read Changelog Version 5) which is created just to showcase token usage and cost build-up.
 This project has been tested with Python 3.15<br>
 Dependencies required can be found in the file "requirements.txt"<br>
 Rename the file ".env.example" to ".env" and fill in OPENROUTER_API_KEY with your actual api key<br>
